@@ -1,0 +1,30 @@
+[project]
+name = "energy-grpc-timeseries"
+version = "0.1.0"
+description = "Energy tracking gRPC service"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "grpcio>=1.80",
+    "grpcio-tools>=1.80",
+    "protobuf>=7.35.0",
+    "redis>=7.4.0",
+    "watchfiles>=0.21.0"
+]
+[tool.uv]
+constraint-dependencies = [
+    "grpcio>=1.80",
+    "grpcio-tools>=1.80",
+]
+[tool.uv.scripts]
+gen-protos = """
+python -m grpc_tools.protoc \
+  -I protos \
+  --python_out=src/energy_server/generated \
+  --grpc_python_out=src/energy_server/generated \
+  protos/*.proto
+"""
+dev = "watchfiles 'uv run gen-protos' protos"
+
+[tool.setuptools.packages.find]
+where = ["src"]
