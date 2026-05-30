@@ -1,0 +1,57 @@
+# =========================
+# 1) BUILD STAGE
+# =========================
+FROM python:3.12-slim AS builder
+
+WORKDIR /app
+
+# System tools
+RUN apt update && apt install -y --no-install-recommends \
+    make \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install uv
+RUN pip install --no-cache-dir uv
+
+# Copy dependency metadata first (best cache reuse)
+COPY pyproject.toml uv.lock /app/
+
+# Install dependencies
+RUN uv sync --frozen
+
+# Copy only files needed for proto generation
+COPY Makefile /app/
+COPY protos/ /app/protos/
+
+# Create generated package directory
+RUN mkdir -p /app/src/energy_server/generated \
+    && touch /app/src/energy_server/generated/__init__.py
+
+# Generate gRPC code
+# This layer is only invalidated if:
+# - Makefile changes
+# - protos/ changes
+RUN make gen-protos
+
+# Now copy the rest of the source code
+COPY src/ /app/src/
+
+# Re-run gen-protos after src copy only if you want generated files physically present in src
+# Usually not needed because generated files are already in /app/src/energy_server/generated
+# RUN make gen-protos
+
+# Install package into system Python
+RUN uv pip install --system .
+
+# =========================
+# 2) RUNTIME STAGE
+# =========================
+FROM python:3.12-slim AS runtime
+
+WORKDIR /app
+
+# Copy installed Python environment from builder
+COPY --from=builder /usr/local /usr/local
+
+# Run the installed CLI
+CMD ["energy-server"]
