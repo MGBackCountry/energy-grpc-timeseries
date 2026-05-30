@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package energy;
 
-import "google/protobuf/timestamp.proto";
+//import "google/protobuf/timestamp.proto";
 import "google/protobuf/empty.proto";
 
 service EnergyStore {
@@ -13,7 +13,7 @@ service EnergyStore {
   rpc GetVersion(google.protobuf.Empty) returns (VersionReply);
 
   // Handig voor time-series (aanrader)
-  rpc QueryRange(QueryRangeRequest) returns (QueryRangeReply);
+//  rpc QueryRange(QueryRangeRequest) returns (QueryRangeReply);
 }
 
 message EntryKey {

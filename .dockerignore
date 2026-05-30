@@ -18,8 +18,8 @@ __pycache__/
 tests/
 
 # Generated gRPC files (important!)
-generated/energy_server/generated/*.py
-!generated/energy_server/__init__.py
+src/energy_server/generated/*.py
+!src/energy_server/generated/__init__.py
 
 # Env files
 .env

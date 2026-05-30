@@ -32,7 +32,7 @@ MANIFEST
 
 # Ignore files in generated direcory, except for __init__.py
 **/generated/*
-!**/generated/energy_server/__init__.py
+!**/generated/__init__.py
 
 # PyInstaller
 #   Usually these files are written by a python script from a template

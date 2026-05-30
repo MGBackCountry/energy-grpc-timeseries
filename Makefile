@@ -1,7 +1,7 @@
 PYTHON := python
 MODULE := energy_server
 PROTO_DIR := ./protos
-GEN_DIR := ./generated/energy_server
+GEN_DIR := ./src/energy_server/generated
 STAMP := $(GEN_DIR)/.protos.stamp
 
 .PHONY: install gen-protos run dev clean docker-build docker-run test

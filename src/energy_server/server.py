@@ -7,7 +7,7 @@ APP_VERSION = version("energy-grpc-timeseries")
 import grpc
 
 from config import GRPC_PORT
-from generated.energy_server import energy_pb2, energy_pb2_grpc
+from generated import energy_pb2, energy_pb2_grpc
 from redis_store import RedisTimeSeriesStore
 
 
