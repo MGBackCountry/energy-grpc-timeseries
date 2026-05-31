@@ -11,10 +11,22 @@ dependencies = [
     "redis>=7.4.0",
     "watchfiles>=0.21.0"
 ]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0.0"
+]
+
 [tool.uv]
 constraint-dependencies = [
     "grpcio>=1.80",
     "grpcio-tools>=1.80",
 ]
+
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+addopts = "-v -s --tb-short"
