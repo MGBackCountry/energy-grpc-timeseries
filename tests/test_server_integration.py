@@ -40,16 +40,11 @@ class FakeRedisStore:
 
 
 @pytest.fixture
-def servicer(monkeypatch):
-    fake_store = FakeRedisStore()
-    monkeypatch.setattr(
-        server,
-        getattr(server, "RedisTimeSeriesStore").__name__,
-        lambda: fake_store)
-    svc = server.EnergyStoreServicer()
-    return svc
+def servicer():
+    return server.EnergyStoreServicer(store=FakeRedisStore())
 
 
+# noinspection PyUnresolvedReferences
 def make_entry(meter_id="m-1", stream="power", timestamp_ms=1000, value=12.5):
     return energy_pb2.Entry(
         key=energy_pb2.EntryKey(
@@ -60,7 +55,7 @@ def make_entry(meter_id="m-1", stream="power", timestamp_ms=1000, value=12.5):
         value=value,
     )
 
-
+# noinspection PyUnresolvedReferences
 def make_key(meter_id="m-1", stream="power", timestamp_ms=1000):
     return energy_pb2.EntryKey(
         meter_id=meter_id,
@@ -69,15 +64,9 @@ def make_key(meter_id="m-1", stream="power", timestamp_ms=1000):
     )
 
 
-def test_init_uses_mocked_redis_store(monkeypatch):
+def test_init_uses_mocked_redis_store():
     fake_store = FakeRedisStore()
-    monkeypatch.setattr(
-        server,
-        getattr(server, "RedisTimeSeriesStore").__name__,
-        lambda: fake_store)
-
-    svc = server.EnergyStoreServicer()
-
+    svc = server.EnergyStoreServicer(store=fake_store)
     assert svc.store is fake_store
 
 
@@ -215,46 +204,26 @@ def test_query_range_applies_limit(servicer):
     assert reply.points[1].value == pytest.approx(20.0)
 
 
-def test_serve_prints_version_and_does_not_start_server(monkeypatch, capsys):
-    monkeypatch.setattr(
-        server.argparse.ArgumentParser,
-        "parse_args",
-        lambda self: types.SimpleNamespace(version=True),
+def test_serve_prints_version_and_does_not_start_server(capsys):
+    fake_server = Mock(name="grpc_server")
+    grpc_server_factory = Mock(name="grpc_server_factory", return_value=fake_server)
+
+    server.serve(
+        args=types.SimpleNamespace(version=True),
+        grpc_server_factory=grpc_server_factory,
+        out=print,
     )
-
-    version_calls = []
-
-    def fake_version(dist_name):
-        version_calls.append(dist_name)
-        return "9.9.9"
-
-    monkeypatch.setattr(
-        server,
-        getattr(server, "version").__name__,
-        fake_version)
-
-    grpc_server_mock = Mock(name="grpc_server")
-    grpc_server_factory = Mock(name="grpc_server_factory", return_value=grpc_server_mock)
-    monkeypatch.setattr(server.grpc, "server", grpc_server_factory)
-
-    server.serve()
 
     output = capsys.readouterr().out.strip()
-    assert output == "9.9.9"
-    assert version_calls == ["energy-grpc-timeseries"]
+    assert output == server.APP_VERSION
     grpc_server_factory.assert_not_called()
 
-
-def test_serve_configures_and_starts_grpc_server(monkeypatch, capsys):
-    monkeypatch.setattr(
-        server.argparse.ArgumentParser,
-        "parse_args",
-        lambda self: types.SimpleNamespace(version=False),
-    )
+def test_serve_configures_and_starts_grpc_server(capsys):
+    fake_store = FakeRedisStore()
+    fake_servicer = server.EnergyStoreServicer(store=fake_store)
 
     fake_server = Mock(name="grpc_server_instance")
     grpc_server_factory = Mock(return_value=fake_server)
-    monkeypatch.setattr(server.grpc, "server", grpc_server_factory)
 
     added = {}
 
@@ -262,32 +231,20 @@ def test_serve_configures_and_starts_grpc_server(monkeypatch, capsys):
         added["servicer"] = servicer
         added["grpc_server"] = grpc_server
 
-    monkeypatch.setattr(
-        server.energy_pb2_grpc,
-        "add_EnergyStoreServicer_to_server",
-        fake_add_servicer_to_server,
+    server.serve(
+        args=types.SimpleNamespace(version=False),
+        grpc_server_factory=grpc_server_factory,
+        register_servicer=fake_add_servicer_to_server,
+        servicer_factory=lambda: fake_servicer,
+        port=50051,
     )
 
-    fake_store = FakeRedisStore()
-    # noinspection PyUnresolvedReferences
-    monkeypatch.setattr(
-        server,
-        "RedisTimeSeriesStore",
-        lambda: fake_store)
-    # noinspection PyUnresolvedReferences
-    monkeypatch.setattr(
-        server,
-        "GRPC_PORT",
-        "50051")
-
-    server.serve()
-
-    grpc_server_factory.assert_called_once()
+    grpc_server_factory.assert_called_once_with()
     fake_server.add_insecure_port.assert_called_once_with("[::]:50051")
     fake_server.start.assert_called_once_with()
     fake_server.wait_for_termination.assert_called_once_with()
 
-    assert isinstance(added["servicer"], server.EnergyStoreServicer)
+    assert added["servicer"] is fake_servicer
     assert added["servicer"].store is fake_store
     assert added["grpc_server"] is fake_server
 

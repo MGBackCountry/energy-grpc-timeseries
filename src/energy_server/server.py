@@ -1,19 +1,23 @@
 import argparse
 from concurrent import futures
-from importlib.metadata import version
-
-APP_VERSION = version("energy-grpc-timeseries")
+from importlib.metadata import version, PackageNotFoundError
+from typing import Callable, Any
 
 import grpc
 
-from energy_server.config import GRPC_PORT
-from energy_server.generated import energy_pb2, energy_pb2_grpc
-from energy_server.redis_store import RedisTimeSeriesStore
+from .config import GRPC_PORT
+from .generated import energy_pb2, energy_pb2_grpc
+from .redis_store import RedisTimeSeriesStore
+
+try:
+    APP_VERSION = version("energy-grpc-timeseries")
+except PackageNotFoundError:
+    APP_VERSION = "dev"
 
 
 class EnergyStoreServicer(energy_pb2_grpc.EnergyStoreServicer):
-    def __init__(self):
-        self.store = RedisTimeSeriesStore()
+    def __init__(self, store=None):
+        self.store = store or RedisTimeSeriesStore()
 
     def GetVersion(self, request, context):
         return energy_pb2.VersionReply(version=APP_VERSION)
@@ -56,22 +60,40 @@ class EnergyStoreServicer(energy_pb2_grpc.EnergyStoreServicer):
             points=[energy_pb2.QueryPoint(timestamp_ms=ts, value=val) for ts, val in pts]
         )
 
-
-def serve():
+def build_parser():
     parser = argparse.ArgumentParser()
     parser.add_argument("--version", action="store_true")
-    args = parser.parse_args()
+    return parser
+
+
+def serve(
+        args=None,
+        grpc_server_factory=None,
+        register_servicer=None,
+        servicer_factory=None,
+        port=None,
+        out: OutFn = print):
+
+    args = args or build_parser().parse_args()
+    grpc_server_factory = grpc_server_factory or (lambda: grpc.server(futures.ThreadPoolExecutor(max_workers=10)))
+    register_servicer = register_servicer or energy_pb2_grpc.add_EnergyStoreServicer_to_server
+    servicer_factory = servicer_factory or EnergyStoreServicer
+    port = port if port is not None else GRPC_PORT
+
     if args.version:
-        print(version("energy-grpc-timeseries"))
+        out(APP_VERSION)
         return
 
-    server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
-    energy_pb2_grpc.add_EnergyStoreServicer_to_server(EnergyStoreServicer(), server)
-    server.add_insecure_port(f"[::]:{GRPC_PORT}")
-    server.start()
-    print(f"gRPC EnergyStore running on port {GRPC_PORT}")
-    server.wait_for_termination()
+    grpc_server = grpc_server_factory()
+    servicer = servicer_factory()
+    register_servicer(servicer, grpc_server)
+    grpc_server.add_insecure_port(f"[::]:{port}")
+    grpc_server.start()
+    out(f"gRPC EnergyStore running on port {port}")
+    grpc_server.wait_for_termination()
+
 
 
 if __name__ == "__main__":
+    OutFn = Callable[[str], Any]
     serve()
