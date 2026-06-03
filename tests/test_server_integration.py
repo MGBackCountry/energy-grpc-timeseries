@@ -3,8 +3,8 @@ from unittest.mock import Mock
 
 import pytest
 
-import server
-from generated import energy_pb2
+from energy_server import server
+from energy_server.generated import energy_pb2
 
 
 class FakeRedisStore:
@@ -42,7 +42,10 @@ class FakeRedisStore:
 @pytest.fixture
 def servicer(monkeypatch):
     fake_store = FakeRedisStore()
-    monkeypatch.setattr(server, "RedisTimeSeriesStore", lambda: fake_store)
+    monkeypatch.setattr(
+        server,
+        getattr(server, "RedisTimeSeriesStore").__name__,
+        lambda: fake_store)
     svc = server.EnergyStoreServicer()
     return svc
 
@@ -68,7 +71,10 @@ def make_key(meter_id="m-1", stream="power", timestamp_ms=1000):
 
 def test_init_uses_mocked_redis_store(monkeypatch):
     fake_store = FakeRedisStore()
-    monkeypatch.setattr(server, "RedisTimeSeriesStore", lambda: fake_store)
+    monkeypatch.setattr(
+        server,
+        getattr(server, "RedisTimeSeriesStore").__name__,
+        lambda: fake_store)
 
     svc = server.EnergyStoreServicer()
 
@@ -222,7 +228,10 @@ def test_serve_prints_version_and_does_not_start_server(monkeypatch, capsys):
         version_calls.append(dist_name)
         return "9.9.9"
 
-    monkeypatch.setattr(server, "version", fake_version)
+    monkeypatch.setattr(
+        server,
+        getattr(server, "version").__name__,
+        fake_version)
 
     grpc_server_mock = Mock(name="grpc_server")
     grpc_server_factory = Mock(name="grpc_server_factory", return_value=grpc_server_mock)
@@ -260,8 +269,16 @@ def test_serve_configures_and_starts_grpc_server(monkeypatch, capsys):
     )
 
     fake_store = FakeRedisStore()
-    monkeypatch.setattr(server, "RedisTimeSeriesStore", lambda: fake_store)
-    monkeypatch.setattr(server, "GRPC_PORT", 50051)
+    # noinspection PyUnresolvedReferences
+    monkeypatch.setattr(
+        server,
+        "RedisTimeSeriesStore",
+        lambda: fake_store)
+    # noinspection PyUnresolvedReferences
+    monkeypatch.setattr(
+        server,
+        "GRPC_PORT",
+        "50051")
 
     server.serve()
 

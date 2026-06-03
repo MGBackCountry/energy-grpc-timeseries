@@ -1,5 +1,5 @@
 import redis
-from config import REDIS_HOST, REDIS_PORT
+from energy_server.config import REDIS_HOST, REDIS_PORT
 
 class RedisTimeSeriesStore:
     def __init__(self):

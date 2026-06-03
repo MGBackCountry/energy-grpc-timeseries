@@ -23,10 +23,14 @@ constraint-dependencies = [
     "grpcio-tools>=1.80",
 ]
 
+[tool.setuptools]
+package-dir = {"" = "src"}
+
 [tool.setuptools.packages.find]
 where = ["src"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = ["test_*.py"]
-addopts = "-v -s --tb-short"
+addopts = "-v -s"
+pythonpath = ["src", "src/energy_server/generated"]
