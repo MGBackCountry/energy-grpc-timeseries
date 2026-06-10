@@ -10,10 +10,8 @@ service EnergyStore {
   rpc GetEntry(GetEntryRequest) returns (GetEntryReply);
   rpc UpdateEntry(UpdateEntryRequest) returns (StatusReply);
   rpc DeleteEntry(DeleteEntryRequest) returns (StatusReply);
+  rpc QueryRange(QueryRangeRequest) returns (QueryRangeReply);
   rpc GetVersion(google.protobuf.Empty) returns (VersionReply);
-
-  // Handig voor time-series (aanrader)
-//  rpc QueryRange(QueryRangeRequest) returns (QueryRangeReply);
 }
 
 message EntryKey {
