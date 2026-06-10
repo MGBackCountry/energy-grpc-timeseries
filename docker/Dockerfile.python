@@ -36,6 +36,9 @@ RUN make gen-protos
 # Now copy the rest of the source code
 COPY src/ /app/src/
 
+# Fix relative imports in generated files
+RUN sed -i 's/^import energy_pb2 as energy__pb2$/from . import energy_pb2 as energy__pb2/' /app/src/energy_server/generated/energy_pb2_grpc.py
+
 # Re-run gen-protos after src copy only if you want generated files physically present in src
 # Usually not needed because generated files are already in /app/src/energy_server/generated
 # RUN make gen-protos
@@ -52,6 +55,9 @@ WORKDIR /app
 
 # Copy installed Python environment from builder
 COPY --from=builder /usr/local /usr/local
+
+# Set Python to run in unbuffered mode for better logging
+ENV PYTHONUNBUFFERED=1
 
 # Run the installed CLI
 CMD ["energy-server"]

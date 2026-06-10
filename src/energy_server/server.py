@@ -9,6 +9,9 @@ from .config import GRPC_PORT
 from .generated import energy_pb2, energy_pb2_grpc
 from .redis_store import RedisTimeSeriesStore
 
+# Type alias for output function
+OutFn = Callable[[str], Any]
+
 try:
     APP_VERSION = version("energy-grpc-timeseries")
 except PackageNotFoundError:
@@ -95,5 +98,4 @@ def serve(
 
 
 if __name__ == "__main__":
-    OutFn = Callable[[str], Any]
     serve()

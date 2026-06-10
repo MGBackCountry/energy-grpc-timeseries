@@ -23,6 +23,9 @@ constraint-dependencies = [
     "grpcio-tools>=1.80",
 ]
 
+[project.scripts]
+energy-server = "energy_server.server:serve"
+
 [tool.setuptools]
 package-dir = {"" = "src"}
 
