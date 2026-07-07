@@ -94,8 +94,3 @@ def serve(
     grpc_server.start()
     out(f"gRPC EnergyStore running on port {port}")
     grpc_server.wait_for_termination()
-
-
-
-if __name__ == "__main__":
-    serve()

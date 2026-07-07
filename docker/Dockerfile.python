@@ -14,7 +14,7 @@ RUN apt update && apt install -y --no-install-recommends \
 RUN pip install --no-cache-dir uv
 
 # Copy dependency metadata first (best cache reuse)
-COPY pyproject.toml uv.lock /app/
+COPY pyproject.toml /app/
 
 # Install dependencies
 RUN uv sync --frozen
