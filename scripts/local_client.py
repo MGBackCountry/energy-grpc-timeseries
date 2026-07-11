@@ -9,8 +9,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT / "src"))
 sys.path.insert(0, str(REPO_ROOT / "src" / "energy_server" / "generated"))
 
-import energy_pb2
-import energy_pb2_grpc
+from energy_server.generated import energy_pb2, energy_pb2_grpc
 
 
 def build_entry(
