@@ -72,6 +72,57 @@ class TestGrpcClientIntegration:
         assert response.ok is True
         assert response.message == "set"
 
+    def test_set_entry_duplicate_same_value_is_idempotent(self, client):
+        timestamp_ms = 1705318200000
+        request = energy_pb2.SetEntryRequest(
+            entry=energy_pb2.Entry(
+                key=energy_pb2.EntryKey(
+                    meter_id="home-meter-001",
+                    stream="consumed_kwh",
+                    timestamp_ms=timestamp_ms,
+                ),
+                value=42.5,
+            )
+        )
+
+        first = client.SetEntry(request)
+        second = client.SetEntry(request)
+
+        assert first.ok is True
+        assert first.message == "set"
+        assert second.ok is True
+        assert second.message == "set"
+
+    def test_set_entry_duplicate_different_value_returns_conflict(self, client):
+        timestamp_ms = 1705318200000
+        first_request = energy_pb2.SetEntryRequest(
+            entry=energy_pb2.Entry(
+                key=energy_pb2.EntryKey(
+                    meter_id="home-meter-001",
+                    stream="consumed_kwh",
+                    timestamp_ms=timestamp_ms,
+                ),
+                value=42.5,
+            )
+        )
+        second_request = energy_pb2.SetEntryRequest(
+            entry=energy_pb2.Entry(
+                key=energy_pb2.EntryKey(
+                    meter_id="home-meter-001",
+                    stream="consumed_kwh",
+                    timestamp_ms=timestamp_ms,
+                ),
+                value=99.0,
+            )
+        )
+
+        first = client.SetEntry(first_request)
+        second = client.SetEntry(second_request)
+
+        assert first.ok is True
+        assert second.ok is False
+        assert second.message == "conflict"
+
     def test_get_entry_via_grpc(self, client, grpc_server_and_channel):
         """Test GetEntry RPC call."""
         _, _, fake_store = grpc_server_and_channel

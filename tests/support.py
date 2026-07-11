@@ -1,4 +1,5 @@
 from energy_server.generated import energy_pb2
+from energy_server.redis_store import PointConflictError
 
 
 class FakeRedisStore:
@@ -12,6 +13,18 @@ class FakeRedisStore:
 
     def set_point(self, meter_id: str, stream: str, ts_ms: int, value: float) -> None:
         self.data[self._key(meter_id, stream, ts_ms)] = float(value)
+
+    def set_point_idempotent(self, meter_id: str, stream: str, ts_ms: int, value: float) -> None:
+        key = self._key(meter_id, stream, ts_ms)
+        if key not in self.data:
+            self.data[key] = float(value)
+            return
+
+        if self.data[key] != float(value):
+            raise PointConflictError(
+                f"Point already exists with different value for meter_id={meter_id!r}, "
+                f"stream={stream!r}, timestamp_ms={ts_ms}"
+            )
 
     def get_point(self, meter_id: str, stream: str, ts_ms: int) -> float | None:
         return self.data.get(self._key(meter_id, stream, ts_ms))

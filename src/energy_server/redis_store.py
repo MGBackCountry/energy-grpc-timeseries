@@ -7,6 +7,10 @@ class RedisStoreDriftError(RuntimeError):
     """Raised when Redis index and value structures disagree for the same point."""
 
 
+class PointConflictError(ValueError):
+    """Raised when a point already exists with a different value."""
+
+
 class RedisTimeSeriesStore:
     def __init__(self) -> None:
         self.r = redis.Redis(host=REDIS_HOST, port=REDIS_PORT, decode_responses=True)
@@ -25,6 +29,34 @@ class RedisTimeSeriesStore:
         pipe.zadd(zkey, {ts_field: ts_ms})
         pipe.hset(hkey, ts_field, str(value))
         pipe.execute()
+
+    def set_point_idempotent(self, meter_id: str, stream: str, ts_ms: int, value: float) -> None:
+        zkey = self._zkey(meter_id, stream)
+        hkey = self._hkey(meter_id, stream)
+        ts_field = str(ts_ms)
+
+        pipe = self.r.pipeline()
+        pipe.hexists(hkey, ts_field)
+        pipe.zscore(zkey, ts_field)
+        pipe.hget(hkey, ts_field)
+        hash_exists, sorted_score, existing_value = pipe.execute()
+        sorted_exists = sorted_score is not None
+
+        if hash_exists != sorted_exists:
+            raise RedisStoreDriftError(
+                f"Point presence drift for meter_id={meter_id!r}, stream={stream!r}, timestamp_ms={ts_ms}: "
+                f"hash_exists={hash_exists}, sorted_set_exists={sorted_exists}"
+            )
+
+        if not hash_exists:
+            self.set_point(meter_id, stream, ts_ms, value)
+            return
+
+        if float(existing_value) != float(value):
+            raise PointConflictError(
+                f"Point already exists with different value for meter_id={meter_id!r}, "
+                f"stream={stream!r}, timestamp_ms={ts_ms}"
+            )
 
     def get_point(self, meter_id: str, stream: str, ts_ms: int) -> float | None:
         hkey = self._hkey(meter_id, stream)

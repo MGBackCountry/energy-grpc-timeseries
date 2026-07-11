@@ -7,7 +7,7 @@ import grpc
 
 from .config import GRPC_PORT
 from .generated import energy_pb2, energy_pb2_grpc
-from .redis_store import RedisTimeSeriesStore
+from .redis_store import PointConflictError, RedisTimeSeriesStore
 
 Point: TypeAlias = tuple[int, float]
 OutFn = Callable[[str], Any]
@@ -16,6 +16,8 @@ DEFAULT_MAX_WORKERS = 10
 
 class TimeSeriesStore(Protocol):
     def set_point(self, meter_id: str, stream: str, ts_ms: int, value: float) -> None: ...
+
+    def set_point_idempotent(self, meter_id: str, stream: str, ts_ms: int, value: float) -> None: ...
 
     def get_point(self, meter_id: str, stream: str, ts_ms: int) -> float | None: ...
 
@@ -65,7 +67,10 @@ class EnergyStoreServicer(energy_pb2_grpc.EnergyStoreServicer):
         del context
         e = request.entry
         k = e.key
-        self.store.set_point(k.meter_id, k.stream, k.timestamp_ms, e.value)
+        try:
+            self.store.set_point_idempotent(k.meter_id, k.stream, k.timestamp_ms, e.value)
+        except PointConflictError:
+            return energy_pb2.StatusReply(ok=False, message="conflict")
 
         return energy_pb2.StatusReply(ok=True, message="set")
 

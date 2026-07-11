@@ -29,6 +29,32 @@ def test_set_entry_persists_value_and_returns_status(servicer):
     assert servicer.store.get_point("m-1", "power", 1000) == pytest.approx(12.5)
 
 
+def test_set_entry_is_idempotent_when_value_matches(servicer):
+    request = types.SimpleNamespace(entry=make_entry(value=12.5))
+
+    first = servicer.SetEntry(request, context=Mock())
+    second = servicer.SetEntry(request, context=Mock())
+
+    assert first.ok is True
+    assert first.message == "set"
+    assert second.ok is True
+    assert second.message == "set"
+    assert servicer.store.get_point("m-1", "power", 1000) == pytest.approx(12.5)
+
+
+def test_set_entry_returns_conflict_when_value_differs(servicer):
+    initial_request = types.SimpleNamespace(entry=make_entry(value=12.5))
+    conflict_request = types.SimpleNamespace(entry=make_entry(value=99.0))
+
+    first = servicer.SetEntry(initial_request, context=Mock())
+    second = servicer.SetEntry(conflict_request, context=Mock())
+
+    assert first.ok is True
+    assert second.ok is False
+    assert second.message == "conflict"
+    assert servicer.store.get_point("m-1", "power", 1000) == pytest.approx(12.5)
+
+
 def test_get_entry_returns_found_false_when_missing(servicer):
     request = types.SimpleNamespace(
         key=make_key(meter_id="m-404", stream="power", timestamp_ms=9999)
