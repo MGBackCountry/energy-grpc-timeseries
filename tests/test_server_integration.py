@@ -1,4 +1,5 @@
 import types
+from datetime import UTC, datetime
 from unittest.mock import Mock
 
 import pytest
@@ -27,6 +28,26 @@ def test_set_entry_persists_value_and_returns_status(servicer):
     assert reply.ok is True
     assert reply.message == "set"
     assert servicer.store.get_point("m-1", "power", 1000) == pytest.approx(12.5)
+
+
+def test_set_entry_converts_datetime_timestamp_to_milliseconds(servicer):
+    timestamp = server.Timestamp()
+    timestamp.FromDatetime(datetime(2024, 1, 15, 10, 30, tzinfo=UTC))
+    request = types.SimpleNamespace(
+        entry=types.SimpleNamespace(
+            key=types.SimpleNamespace(
+                meter_id="m-1",
+                stream="power",
+                timestamp_ms=timestamp,
+            ),
+            value=12.5,
+        )
+    )
+
+    reply = servicer.SetEntry(request, context=Mock())
+
+    assert reply.ok is True
+    assert servicer.store.get_point("m-1", "power", 1705314600000) == pytest.approx(12.5)
 
 
 def test_set_entry_is_idempotent_when_value_matches(servicer):
@@ -76,7 +97,7 @@ def test_get_entry_returns_entry_when_present(servicer):
     assert reply.found is True
     assert reply.entry.key.meter_id == "m-1"
     assert reply.entry.key.stream == "power"
-    assert reply.entry.key.timestamp_ms == 1000
+    assert reply.entry.key.timestamp_ms.ToMilliseconds() == 1000
     assert reply.entry.value == pytest.approx(42.25)
 
 

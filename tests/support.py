@@ -1,5 +1,6 @@
 from energy_server.generated import energy_pb2
 from energy_server.redis_store import PointConflictError
+from google.protobuf.timestamp_pb2 import Timestamp
 
 
 class FakeRedisStore:
@@ -63,7 +64,10 @@ def make_entry(
         key=energy_pb2.EntryKey(
             meter_id=meter_id,
             stream=stream,
-            timestamp_ms=timestamp_ms,
+            timestamp_ms=Timestamp(
+                seconds=timestamp_ms // 1_000,
+                nanos=(timestamp_ms % 1_000) * 1_000_000,
+            ),
         ),
         value=value,
     )
@@ -77,5 +81,8 @@ def make_key(
     return energy_pb2.EntryKey(
         meter_id=meter_id,
         stream=stream,
-        timestamp_ms=timestamp_ms,
+        timestamp_ms=Timestamp(
+            seconds=timestamp_ms // 1_000,
+            nanos=(timestamp_ms % 1_000) * 1_000_000,
+        ),
     )

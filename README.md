@@ -27,7 +27,8 @@ The API contract is defined in `protos/energy.proto`.
 
 A time series is always scoped to the pair `(meter_id, stream)`. Different streams for the same meter are stored separately.
 
-- Timestamps use **epoch milliseconds**
+- `EntryKey.timestamp_ms` accepts a protobuf `Timestamp` date-time (for example, `2024-01-15T10:30:00Z`) and the server converts it to **epoch milliseconds** for storage
+- `start_ms` and `end_ms` use **epoch milliseconds**
 - `start_ms` and `end_ms` are **inclusive**
 - `limit = 0` means no limit
 - Negative limits are currently treated the same as no limit

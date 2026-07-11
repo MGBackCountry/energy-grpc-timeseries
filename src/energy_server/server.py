@@ -4,6 +4,7 @@ from importlib.metadata import PackageNotFoundError, version
 from typing import Any, Callable, Protocol, TypeAlias
 
 import grpc
+from google.protobuf.timestamp_pb2 import Timestamp
 
 from .config import GRPC_PORT
 from .generated import energy_pb2, energy_pb2_grpc
@@ -40,12 +41,21 @@ except PackageNotFoundError:
     APP_VERSION = "dev"
 
 
+def _timestamp_to_milliseconds(timestamp: Timestamp) -> int:
+    return timestamp.seconds * 1_000 + timestamp.nanos // 1_000_000
+
+
+def _timestamp_from_milliseconds(timestamp_ms: int) -> Timestamp:
+    seconds, milliseconds = divmod(timestamp_ms, 1_000)
+    return Timestamp(seconds=seconds, nanos=milliseconds * 1_000_000)
+
+
 def _build_entry(meter_id: str, stream: str, timestamp_ms: int, value: float) -> energy_pb2.Entry:
     return energy_pb2.Entry(
         key=energy_pb2.EntryKey(
             meter_id=meter_id,
             stream=stream,
-            timestamp_ms=timestamp_ms,
+            timestamp_ms=_timestamp_from_milliseconds(timestamp_ms),
         ),
         value=value,
     )
@@ -67,8 +77,9 @@ class EnergyStoreServicer(energy_pb2_grpc.EnergyStoreServicer):
         del context
         e = request.entry
         k = e.key
+        timestamp_ms = _timestamp_to_milliseconds(k.timestamp_ms)
         try:
-            self.store.set_point_idempotent(k.meter_id, k.stream, k.timestamp_ms, e.value)
+            self.store.set_point_idempotent(k.meter_id, k.stream, timestamp_ms, e.value)
         except PointConflictError:
             return energy_pb2.StatusReply(ok=False, message="conflict")
 
@@ -77,26 +88,29 @@ class EnergyStoreServicer(energy_pb2_grpc.EnergyStoreServicer):
     def GetEntry(self, request: Any, context: Any) -> energy_pb2.GetEntryReply:
         del context
         k = request.key
-        v = self.store.get_point(k.meter_id, k.stream, k.timestamp_ms)
+        timestamp_ms = _timestamp_to_milliseconds(k.timestamp_ms)
+        v = self.store.get_point(k.meter_id, k.stream, timestamp_ms)
         if v is None:
             return energy_pb2.GetEntryReply(found=False)
-        entry = _build_entry(k.meter_id, k.stream, k.timestamp_ms, v)
+        entry = _build_entry(k.meter_id, k.stream, timestamp_ms, v)
         return energy_pb2.GetEntryReply(found=True, entry=entry)
 
     def UpdateEntry(self, request: Any, context: Any) -> energy_pb2.StatusReply:
         del context
         e = request.entry
         k = e.key
-        if not self.store.exists_point(k.meter_id, k.stream, k.timestamp_ms):
+        timestamp_ms = _timestamp_to_milliseconds(k.timestamp_ms)
+        if not self.store.exists_point(k.meter_id, k.stream, timestamp_ms):
             return energy_pb2.StatusReply(ok=False, message="not_found")
-        self.store.set_point(k.meter_id, k.stream, k.timestamp_ms, e.value)
+        self.store.set_point(k.meter_id, k.stream, timestamp_ms, e.value)
 
         return energy_pb2.StatusReply(ok=True, message="updated")
 
     def DeleteEntry(self, request: Any, context: Any) -> energy_pb2.StatusReply:
         del context
         k = request.key
-        ok = self.store.delete_point(k.meter_id, k.stream, k.timestamp_ms)
+        timestamp_ms = _timestamp_to_milliseconds(k.timestamp_ms)
+        ok = self.store.delete_point(k.meter_id, k.stream, timestamp_ms)
         return energy_pb2.StatusReply(ok=ok, message="deleted" if ok else "not_found")
 
     def QueryRange(self, request: Any, context: Any) -> energy_pb2.QueryRangeReply:

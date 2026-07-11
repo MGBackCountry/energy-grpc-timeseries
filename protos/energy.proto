@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package energy;
 
-//import "google/protobuf/timestamp.proto";
+import "google/protobuf/timestamp.proto";
 import "google/protobuf/empty.proto";
 
 service EnergyStore {
@@ -17,7 +17,7 @@ service EnergyStore {
 message EntryKey {
   string meter_id = 1;          // bv "home" of "meter-001"
   string stream = 2;            // bv "consumed_kwh" of "produced_kwh"
-  int64 timestamp_ms = 3;       // epoch millis
+  google.protobuf.Timestamp timestamp_ms = 3; // date-time, converted to epoch millis by the server
 }
 
 message Entry {

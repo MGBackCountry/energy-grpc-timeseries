@@ -1,6 +1,7 @@
 """Real gRPC client integration tests."""
 
 from concurrent import futures
+from datetime import UTC, datetime, timedelta
 
 import grpc
 import pytest
@@ -10,6 +11,10 @@ from energy_server.generated import energy_pb2, energy_pb2_grpc
 from google.protobuf import empty_pb2
 
 from support import FakeRedisStore
+
+
+def timestamp_datetime(timestamp_ms: int) -> datetime:
+    return datetime(1970, 1, 1, tzinfo=UTC) + timedelta(milliseconds=timestamp_ms)
 
 
 @pytest.fixture
@@ -61,7 +66,7 @@ class TestGrpcClientIntegration:
                 key=energy_pb2.EntryKey(
                     meter_id="home-meter-001",
                     stream="consumed_kwh",
-                    timestamp_ms=timestamp_ms,
+                    timestamp_ms=timestamp_datetime(timestamp_ms),
                 ),
                 value=42.5,  # 42.5 kWh consumed
             )
@@ -79,7 +84,7 @@ class TestGrpcClientIntegration:
                 key=energy_pb2.EntryKey(
                     meter_id="home-meter-001",
                     stream="consumed_kwh",
-                    timestamp_ms=timestamp_ms,
+                    timestamp_ms=timestamp_datetime(timestamp_ms),
                 ),
                 value=42.5,
             )
@@ -100,7 +105,7 @@ class TestGrpcClientIntegration:
                 key=energy_pb2.EntryKey(
                     meter_id="home-meter-001",
                     stream="consumed_kwh",
-                    timestamp_ms=timestamp_ms,
+                    timestamp_ms=timestamp_datetime(timestamp_ms),
                 ),
                 value=42.5,
             )
@@ -110,7 +115,7 @@ class TestGrpcClientIntegration:
                 key=energy_pb2.EntryKey(
                     meter_id="home-meter-001",
                     stream="consumed_kwh",
-                    timestamp_ms=timestamp_ms,
+                    timestamp_ms=timestamp_datetime(timestamp_ms),
                 ),
                 value=99.0,
             )
@@ -139,7 +144,7 @@ class TestGrpcClientIntegration:
             key=energy_pb2.EntryKey(
                 meter_id=meter_id,
                 stream=stream,
-                timestamp_ms=timestamp_ms,
+                timestamp_ms=timestamp_datetime(timestamp_ms),
             )
         )
 
@@ -148,7 +153,7 @@ class TestGrpcClientIntegration:
         assert response.found is True
         assert response.entry.key.meter_id == meter_id
         assert response.entry.key.stream == stream
-        assert response.entry.key.timestamp_ms == timestamp_ms
+        assert response.entry.key.timestamp_ms.ToMilliseconds() == timestamp_ms
         assert response.entry.value == pytest.approx(value)
 
     def test_get_entry_not_found_via_grpc(self, client):
@@ -157,7 +162,7 @@ class TestGrpcClientIntegration:
             key=energy_pb2.EntryKey(
                 meter_id="nonexistent-meter",
                 stream="power",
-                timestamp_ms=9999999,
+                timestamp_ms=timestamp_datetime(9999999),
             )
         )
 
@@ -181,7 +186,7 @@ class TestGrpcClientIntegration:
                 key=energy_pb2.EntryKey(
                     meter_id=meter_id,
                     stream=stream,
-                    timestamp_ms=timestamp_ms,
+                    timestamp_ms=timestamp_datetime(timestamp_ms),
                 ),
                 value=25.5,  # Updated value
             )
@@ -197,7 +202,7 @@ class TestGrpcClientIntegration:
             key=energy_pb2.EntryKey(
                 meter_id=meter_id,
                 stream=stream,
-                timestamp_ms=timestamp_ms,
+                timestamp_ms=timestamp_datetime(timestamp_ms),
             )
         )
         get_response = client.GetEntry(get_request)
@@ -210,7 +215,7 @@ class TestGrpcClientIntegration:
                 key=energy_pb2.EntryKey(
                     meter_id="nonexistent",
                     stream="power",
-                    timestamp_ms=1000,
+                    timestamp_ms=timestamp_datetime(1000),
                 ),
                 value=50.0,
             )
@@ -236,7 +241,7 @@ class TestGrpcClientIntegration:
             key=energy_pb2.EntryKey(
                 meter_id=meter_id,
                 stream=stream,
-                timestamp_ms=timestamp_ms,
+                timestamp_ms=timestamp_datetime(timestamp_ms),
             )
         )
 
@@ -250,7 +255,7 @@ class TestGrpcClientIntegration:
             key=energy_pb2.EntryKey(
                 meter_id=meter_id,
                 stream=stream,
-                timestamp_ms=timestamp_ms,
+                timestamp_ms=timestamp_datetime(timestamp_ms),
             )
         )
         get_response = client.GetEntry(get_request)
@@ -262,7 +267,7 @@ class TestGrpcClientIntegration:
             key=energy_pb2.EntryKey(
                 meter_id="nonexistent",
                 stream="power",
-                timestamp_ms=1000,
+                timestamp_ms=timestamp_datetime(1000),
             )
         )
 
@@ -454,7 +459,7 @@ class TestGrpcClientIntegration:
                 key=energy_pb2.EntryKey(
                     meter_id="household-1",
                     stream="consumed_kwh",
-                    timestamp_ms=timestamp,
+                    timestamp_ms=timestamp_datetime(timestamp),
                 ),
                 value=2.5,
             )
@@ -468,7 +473,7 @@ class TestGrpcClientIntegration:
                 key=energy_pb2.EntryKey(
                     meter_id="household-1",
                     stream="produced_kwh",
-                    timestamp_ms=timestamp,
+                    timestamp_ms=timestamp_datetime(timestamp),
                 ),
                 value=1.2,
             )
@@ -482,7 +487,7 @@ class TestGrpcClientIntegration:
                 key=energy_pb2.EntryKey(
                     meter_id="household-2",
                     stream="consumed_kwh",
-                    timestamp_ms=timestamp,
+                    timestamp_ms=timestamp_datetime(timestamp),
                 ),
                 value=3.1,
             )

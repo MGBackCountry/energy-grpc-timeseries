@@ -5,6 +5,7 @@ import sys
 from pathlib import Path
 
 import grpc
+from google.protobuf.timestamp_pb2 import Timestamp
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -12,6 +13,11 @@ sys.path.insert(0, str(REPO_ROOT / "src"))
 sys.path.insert(0, str(REPO_ROOT / "src" / "energy_server" / "generated"))
 
 from energy_server.generated import energy_pb2, energy_pb2_grpc
+
+
+def timestamp_from_milliseconds(timestamp_ms: int) -> Timestamp:
+    seconds, milliseconds = divmod(timestamp_ms, 1_000)
+    return Timestamp(seconds=seconds, nanos=milliseconds * 1_000_000)
 
 
 def build_entry(
@@ -24,7 +30,7 @@ def build_entry(
         key=energy_pb2.EntryKey(
             meter_id=meter_id,
             stream=stream,
-            timestamp_ms=timestamp_ms,
+            timestamp_ms=timestamp_from_milliseconds(timestamp_ms),
         ),
         value=value,
     )
@@ -78,7 +84,7 @@ def main() -> int:
                     key=energy_pb2.EntryKey(
                         meter_id=args.meter_id,
                         stream=args.stream,
-                        timestamp_ms=args.timestamp_ms,
+                        timestamp_ms=timestamp_from_milliseconds(args.timestamp_ms),
                     )
                 )
             )
