@@ -16,8 +16,8 @@ RUN pip install --no-cache-dir uv
 # Copy dependency metadata first (best cache reuse)
 COPY pyproject.toml /app/
 
-# Install dependencies
-RUN uv sync --frozen
+# Install dependencies. This repository does not commit a uv.lock file.
+RUN uv sync
 
 # Copy only files needed for proto generation
 COPY Makefile /app/

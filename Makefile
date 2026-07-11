@@ -84,4 +84,4 @@ docker-build:
 	docker build -f $(DOCKERFILE) -t $(DOCKER_IMAGE) .
 
 docker-run:
-	docker compose up
+	docker compose up --build -d
