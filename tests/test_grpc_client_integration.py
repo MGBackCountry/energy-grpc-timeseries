@@ -1,14 +1,6 @@
-"""
-Real gRPC client integration tests.
+"""Real gRPC client integration tests."""
 
-These tests start a real gRPC server and use a real gRPC client to communicate
-with it, testing the full stack with real data.
-"""
-
-import time
-import threading
 from concurrent import futures
-from unittest.mock import Mock
 
 import grpc
 import pytest
@@ -17,34 +9,28 @@ from energy_server import server
 from energy_server.generated import energy_pb2, energy_pb2_grpc
 from google.protobuf import empty_pb2
 
-# Import the fake store from the existing tests
-from test_server_integration import FakeRedisStore
+from support import FakeRedisStore
 
 
 @pytest.fixture
 def grpc_server_and_channel():
     """
-    Start a real gRPC server in a background thread and provide a client channel.
+    Start a real gRPC server on an ephemeral port and provide a client channel.
     Cleanup is handled automatically after the test completes.
     """
-    # Create a fake Redis store for testing
     fake_store = FakeRedisStore()
-
-    # Create the servicer
     servicer = server.EnergyStoreServicer(store=fake_store)
 
-    # Create and start the gRPC server
     grpc_server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
     energy_pb2_grpc.add_EnergyStoreServicer_to_server(servicer, grpc_server)
-    grpc_server.add_insecure_port("[::]:50052")  # Use a different port for testing
+    port = grpc_server.add_insecure_port("127.0.0.1:0")
     grpc_server.start()
 
-    # Create a channel to connect to the server (synchronous)
-    channel = grpc.insecure_channel("localhost:50052")
+    channel = grpc.insecure_channel(f"127.0.0.1:{port}")
+    grpc.channel_ready_future(channel).result(timeout=5)
 
     yield grpc_server, channel, fake_store
 
-    # Cleanup
     channel.close()
     grpc_server.stop(grace=1)
 
@@ -340,6 +326,54 @@ class TestGrpcClientIntegration:
         assert response.points[0].value == pytest.approx(0.5)
         assert response.points[4].value == pytest.approx(2.5)
 
+    def test_query_range_includes_boundary_timestamps(self, client, grpc_server_and_channel):
+        """Test QueryRange includes points exactly on both boundaries."""
+        _, _, fake_store = grpc_server_and_channel
+
+        meter_id = "home-meter-003"
+        stream = "consumed_kwh"
+        fake_store.set_point(meter_id, stream, 1000, 1.0)
+        fake_store.set_point(meter_id, stream, 2000, 2.0)
+        fake_store.set_point(meter_id, stream, 3000, 3.0)
+
+        request = energy_pb2.QueryRangeRequest(
+            meter_id=meter_id,
+            stream=stream,
+            start_ms=1000,
+            end_ms=3000,
+            limit=0,
+        )
+
+        response = client.QueryRange(request)
+
+        assert [(point.timestamp_ms, point.value) for point in response.points] == [
+            (1000, pytest.approx(1.0)),
+            (2000, pytest.approx(2.0)),
+            (3000, pytest.approx(3.0)),
+        ]
+
+    def test_query_range_negative_limit_behaves_as_unlimited(self, client, grpc_server_and_channel):
+        """Test QueryRange treats negative limits like no limit."""
+        _, _, fake_store = grpc_server_and_channel
+
+        meter_id = "home-meter-004"
+        stream = "produced_kwh"
+        for index, value in enumerate((0.5, 1.0, 1.5), start=1):
+            fake_store.set_point(meter_id, stream, index * 1000, value)
+
+        request = energy_pb2.QueryRangeRequest(
+            meter_id=meter_id,
+            stream=stream,
+            start_ms=0,
+            end_ms=9999,
+            limit=-3,
+        )
+
+        response = client.QueryRange(request)
+
+        assert len(response.points) == 3
+        assert [point.timestamp_ms for point in response.points] == [1000, 2000, 3000]
+
     def test_query_range_empty_result(self, client):
         """Test QueryRange returns empty list when no data matches."""
         request = energy_pb2.QueryRangeRequest(
@@ -440,4 +474,3 @@ class TestGrpcClientIntegration:
         result_h2 = client.QueryRange(query_h2)
         assert len(result_h2.points) == 1
         assert result_h2.points[0].value == pytest.approx(3.1)
-

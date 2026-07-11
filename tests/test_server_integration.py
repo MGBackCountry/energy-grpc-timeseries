@@ -4,64 +4,7 @@ from unittest.mock import Mock
 import pytest
 
 from energy_server import server
-from energy_server.generated import energy_pb2
-
-
-class FakeRedisStore:
-    """In-memory fake voor RedisTimeSeriesStore."""
-
-    def __init__(self):
-        self.data = {}
-
-    def _key(self, meter_id: str, stream: str, ts_ms: int):
-        return (meter_id, stream, ts_ms)
-
-    def set_point(self, meter_id: str, stream: str, ts_ms: int, value: float) -> None:
-        self.data[self._key(meter_id, stream, ts_ms)] = float(value)
-
-    def get_point(self, meter_id: str, stream: str, ts_ms: int):
-        return self.data.get(self._key(meter_id, stream, ts_ms))
-
-    def exists_point(self, meter_id: str, stream: str, ts_ms: int) -> bool:
-        return self._key(meter_id, stream, ts_ms) in self.data
-
-    def delete_point(self, meter_id: str, stream: str, ts_ms: int) -> bool:
-        return self.data.pop(self._key(meter_id, stream, ts_ms), None) is not None
-
-    def query_range(self, meter_id: str, stream: str, start_ms: int, end_ms: int, limit: int = 0):
-        points = []
-        for (m_id, s, ts), value in self.data.items():
-            if m_id == meter_id and s == stream and start_ms <= ts <= end_ms:
-                points.append((ts, value))
-        points.sort(key=lambda item: item[0])
-        if limit and limit > 0:
-            points = points[:limit]
-        return points
-
-
-@pytest.fixture
-def servicer():
-    return server.EnergyStoreServicer(store=FakeRedisStore())
-
-
-# noinspection PyUnresolvedReferences
-def make_entry(meter_id="m-1", stream="power", timestamp_ms=1000, value=12.5):
-    return energy_pb2.Entry(
-        key=energy_pb2.EntryKey(
-            meter_id=meter_id,
-            stream=stream,
-            timestamp_ms=timestamp_ms,
-        ),
-        value=value,
-    )
-
-# noinspection PyUnresolvedReferences
-def make_key(meter_id="m-1", stream="power", timestamp_ms=1000):
-    return energy_pb2.EntryKey(
-        meter_id=meter_id,
-        stream=stream,
-        timestamp_ms=timestamp_ms,
-    )
+from support import FakeRedisStore, make_entry, make_key
 
 
 def test_init_uses_mocked_redis_store():
@@ -202,6 +145,47 @@ def test_query_range_applies_limit(servicer):
     assert reply.points[0].value == pytest.approx(10.0)
     assert reply.points[1].timestamp_ms == 2000
     assert reply.points[1].value == pytest.approx(20.0)
+
+
+def test_query_range_includes_start_and_end_boundaries(servicer):
+    servicer.store.set_point("m-1", "power", 1000, 10.0)
+    servicer.store.set_point("m-1", "power", 2000, 20.0)
+    servicer.store.set_point("m-1", "power", 3000, 30.0)
+
+    request = types.SimpleNamespace(
+        meter_id="m-1",
+        stream="power",
+        start_ms=1000,
+        end_ms=3000,
+        limit=0,
+    )
+
+    reply = servicer.QueryRange(request, context=Mock())
+
+    assert [(point.timestamp_ms, point.value) for point in reply.points] == [
+        (1000, pytest.approx(10.0)),
+        (2000, pytest.approx(20.0)),
+        (3000, pytest.approx(30.0)),
+    ]
+
+
+def test_query_range_treats_negative_limit_as_unlimited(servicer):
+    servicer.store.set_point("m-1", "power", 1000, 10.0)
+    servicer.store.set_point("m-1", "power", 2000, 20.0)
+    servicer.store.set_point("m-1", "power", 3000, 30.0)
+
+    request = types.SimpleNamespace(
+        meter_id="m-1",
+        stream="power",
+        start_ms=0,
+        end_ms=9999,
+        limit=-5,
+    )
+
+    reply = servicer.QueryRange(request, context=Mock())
+
+    assert len(reply.points) == 3
+    assert [point.timestamp_ms for point in reply.points] == [1000, 2000, 3000]
 
 
 def test_serve_prints_version_and_does_not_start_server(capsys):
