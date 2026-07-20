@@ -15,14 +15,14 @@ service EnergyStore {
 }
 
 message EntryKey {
-  string meter_id = 1;          // bv "home" of "meter-001"
-  string stream = 2;            // bv "consumed_kwh" of "produced_kwh"
+  string meter_id = 1;          // e.g. "home" or "meter-001"
+  string stream = 2;            // e.g. "consumed_kwh" or "produced_kwh"
   google.protobuf.Timestamp timestamp_ms = 3; // date-time, converted to epoch millis by the server
 }
 
 message Entry {
   EntryKey key = 1;
-  double value = 2;             // kWh in dit voorbeeld
+  double value = 2;             // kWh in this example
 }
 
 message SetEntryRequest {
