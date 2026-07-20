@@ -8,6 +8,7 @@ from client.energy_client import EnergyClient  # noqa: E402
 
 METER = "home"
 STREAM = "consumed_kwh"
+# Example timestamps for demo purposes.
 T1 = datetime(2024, 6, 1, 8, 0, 0, tzinfo=timezone.utc)
 T2 = datetime(2024, 6, 1, 9, 0, 0, tzinfo=timezone.utc)
 T3 = datetime(2024, 6, 1, 10, 0, 0, tzinfo=timezone.utc)
