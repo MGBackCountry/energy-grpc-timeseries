@@ -28,7 +28,7 @@ $(STAMP): $(PROTO_FILES)
 		--python_out=$(GEN_DIR) \
 		--grpc_python_out=$(GEN_DIR) \
 		$(PROTO_DIR)/*.proto
-	sed -i 's/^import energy_pb2/from . import energy_pb2/' $(GEN_DIR)/energy_pb2_grpc.py
+	$(PYTHON) -c "from pathlib import Path; p = Path('$(GEN_DIR)/energy_pb2_grpc.py'); p.write_text(p.read_text().replace('import energy_pb2', 'from . import energy_pb2'))"
 	@touch $(STAMP)
 
 clean:
