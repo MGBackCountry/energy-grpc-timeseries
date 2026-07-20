@@ -1,0 +1,17 @@
+FROM redis:7-alpine
+
+LABEL maintainer="gertjan"
+
+COPY docker/redis.conf /usr/local/etc/redis/redis.conf
+
+# Expose Redis default port
+EXPOSE 6379
+
+# Persist data
+VOLUME ["/data"]
+
+CMD ["redis-server", "/usr/local/etc/redis/redis.conf"]
+
+# Add a simple healthcheck so orchestrators know when Redis is ready
+HEALTHCHECK --interval=30s --timeout=3s --start-period=15s \
+  CMD redis-cli ping || exit 1

@@ -1,0 +1,40 @@
+services:
+  redis:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.redis
+    ports:
+      - "16379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 15s
+    networks:
+      - energy_network
+
+  energy_server:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.python
+    ports:
+      - "50051:50051"
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - energy_network
+
+volumes:
+  redis_data:
+
+networks:
+  energy_network:
+    driver: bridge
+

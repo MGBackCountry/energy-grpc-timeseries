@@ -1,0 +1,25 @@
+# Python artifacts
+__pycache__/
+*.pyc
+*.pyo
+
+# Virtual environments
+.venv/
+
+# Git
+.git
+.gitignore
+
+# IDE
+.vscode/
+.idea/
+
+# Tests
+tests/
+
+# Generated gRPC files (important!)
+src/energy_server/generated/*.py
+!src/energy_server/generated/__init__.py
+
+# Env files
+.env

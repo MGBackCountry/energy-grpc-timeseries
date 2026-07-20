@@ -1,0 +1,39 @@
+[project]
+name = "energy-grpc-timeseries"
+version = "0.1.0"
+description = "Energy tracking gRPC service"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "grpcio>=1.80",
+    "grpcio-tools>=1.80",
+    "protobuf>=6.31.1",
+    "redis>=7.4.0",
+    "watchfiles>=0.21.0"
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0.0"
+]
+
+[tool.uv]
+constraint-dependencies = [
+    "grpcio>=1.80",
+    "grpcio-tools>=1.80",
+]
+
+[project.scripts]
+energy-server = "energy_server.server:serve"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+addopts = "-v -s"
+pythonpath = ["src", "src/energy_server/generated"]
