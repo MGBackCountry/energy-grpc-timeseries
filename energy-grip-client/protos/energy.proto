@@ -1,0 +1,73 @@
+syntax = "proto3";
+
+package energy;
+
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/empty.proto";
+
+service EnergyStore {
+  rpc SetEntry(SetEntryRequest) returns (StatusReply);
+  rpc GetEntry(GetEntryRequest) returns (GetEntryReply);
+  rpc UpdateEntry(UpdateEntryRequest) returns (StatusReply);
+  rpc DeleteEntry(DeleteEntryRequest) returns (StatusReply);
+  rpc QueryRange(QueryRangeRequest) returns (QueryRangeReply);
+  rpc GetVersion(google.protobuf.Empty) returns (VersionReply);
+}
+
+message EntryKey {
+  string meter_id = 1;          // bv "home" of "meter-001"
+  string stream = 2;            // bv "consumed_kwh" of "produced_kwh"
+  google.protobuf.Timestamp timestamp_ms = 3; // date-time, converted to epoch millis by the server
+}
+
+message Entry {
+  EntryKey key = 1;
+  double value = 2;             // kWh in dit voorbeeld
+}
+
+message SetEntryRequest {
+  Entry entry = 1;
+}
+
+message UpdateEntryRequest {
+  Entry entry = 1;
+}
+
+message GetEntryRequest {
+  EntryKey key = 1;
+}
+
+message GetEntryReply {
+  bool found = 1;
+  Entry entry = 2;
+}
+
+message DeleteEntryRequest {
+  EntryKey key = 1;
+}
+
+message QueryRangeRequest {
+  string meter_id = 1;
+  string stream = 2;
+  int64 start_ms = 3;           // inclusive
+  int64 end_ms = 4;             // inclusive
+  int32 limit = 5;              // 0 = no limit
+}
+
+message QueryPoint {
+  int64 timestamp_ms = 1;
+  double value = 2;
+}
+
+message QueryRangeReply {
+  repeated QueryPoint points = 1;
+}
+
+message StatusReply {
+  bool ok = 1;
+  string message = 2;
+}
+
+message VersionReply {
+  string version = 1;
+}

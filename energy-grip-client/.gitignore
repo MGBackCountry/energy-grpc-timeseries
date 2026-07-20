@@ -1,0 +1,21 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
+
+# Generated protobuf bindings
+generated/*.py
+generated/*.pyi
+generated/.protos.stamp
+!generated/__init__.py
+
+# uv
+.python-version
+uv.lock
