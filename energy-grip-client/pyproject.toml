@@ -1,5 +1,5 @@
 [project]
-name = "energy-grpc-client"
+name = "energy-grip-client"
 version = "0.1.0"
 description = "gRPC client for the energy-grpc-timeseries server"
 requires-python = ">=3.11"

@@ -1,4 +1,4 @@
-# energy-grpc-client
+# energy-grip-client
 
 Standalone Python gRPC client for the energy-grpc-timeseries server.
 
