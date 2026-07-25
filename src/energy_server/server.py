@@ -20,7 +20,7 @@ class TimeSeriesStore(Protocol):
 
     def set_point_idempotent(self, meter_id: str, stream: str, ts_ms: int, value: float) -> None: ...
 
-    def get_point(self, meter_id: str, stream: str, ts_ms: int) -> float | None: ...
+    def get_point(self, meter_id: str, stream: str, ts_ms: int) -> float: ...
 
     def exists_point(self, meter_id: str, stream: str, ts_ms: int) -> bool: ...
 
@@ -66,7 +66,7 @@ def _default_grpc_server_factory() -> grpc.Server:
 
 
 class EnergyStoreServicer(energy_pb2_grpc.EnergyStoreServicer):
-    def __init__(self, store: TimeSeriesStore | None = None) -> None:
+    def __init__(self, store: TimeSeriesStore | None = None):
         self.store: TimeSeriesStore = store or RedisTimeSeriesStore()
 
     def GetVersion(self, request: Any, context: Any) -> energy_pb2.VersionReply:

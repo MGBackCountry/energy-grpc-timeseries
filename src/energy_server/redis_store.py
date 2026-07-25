@@ -12,7 +12,7 @@ class PointConflictError(ValueError):
 
 
 class RedisTimeSeriesStore:
-    def __init__(self) -> None:
+    def __init__(self):
         self.r = redis.Redis(host=REDIS_HOST, port=REDIS_PORT, decode_responses=True)
 
     def _zkey(self, meter_id: str, stream: str) -> str:
@@ -58,11 +58,11 @@ class RedisTimeSeriesStore:
                 f"stream={stream!r}, timestamp_ms={ts_ms}"
             )
 
-    def get_point(self, meter_id: str, stream: str, ts_ms: int) -> float | None:
+    def get_point(self, meter_id: str, stream: str, ts_ms: int) -> float:
         hkey = self._hkey(meter_id, stream)
         v = self.r.hget(hkey, str(ts_ms))
         if v is None:
-            return None
+            raise KeyError(f"Point not found for meter_id={meter_id!r}, stream={stream!r}, timestamp_ms={ts_ms}")
         return float(v)
 
     def _point_presence(self, meter_id: str, stream: str, ts_ms: int) -> bool:
