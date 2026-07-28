@@ -1,10 +1,12 @@
 import argparse
 from concurrent import futures
 from importlib.metadata import PackageNotFoundError, version
+import sys
 from typing import Any, Callable, Protocol, TypeAlias
 
 import grpc
 from google.protobuf.timestamp_pb2 import Timestamp
+from google.protobuf import empty_pb2
 
 from .config import GRPC_PORT
 from .generated import energy_pb2, energy_pb2_grpc
@@ -63,6 +65,108 @@ def _build_entry(meter_id: str, stream: str, timestamp_ms: int, value: float) ->
 
 def _default_grpc_server_factory() -> grpc.Server:
     return grpc.server(futures.ThreadPoolExecutor(max_workers=DEFAULT_MAX_WORKERS))
+
+
+def _client_build_entry(args: argparse.Namespace) -> energy_pb2.Entry:
+    return _build_entry(args.meter_id, args.stream, args.timestamp_ms, args.value)
+
+
+def _run_client_action(
+    args: argparse.Namespace,
+    out: OutFn = print,
+    err: OutFn = lambda text: print(text, file=sys.stderr),
+) -> int:
+    try:
+        with grpc.insecure_channel(args.target) as channel:
+            grpc.channel_ready_future(channel).result(timeout=5)
+            client = energy_pb2_grpc.EnergyStoreStub(channel)
+
+            if args.action == "set":
+                if args.value is None:
+                    err("--value is required when --action is set")
+                    return 1
+                set_reply = client.SetEntry(
+                    energy_pb2.SetEntryRequest(entry=_client_build_entry(args))
+                )
+                out(f"SetEntry: ok={set_reply.ok} message={set_reply.message}")
+                return 0
+
+            if args.action == "update":
+                if args.value is None:
+                    err("--value is required when --action is update")
+                    return 1
+                update_reply = client.UpdateEntry(
+                    energy_pb2.UpdateEntryRequest(entry=_client_build_entry(args))
+                )
+                out(f"UpdateEntry: ok={update_reply.ok} message={update_reply.message}")
+                return 0
+
+            if args.action == "delete":
+                delete_reply = client.DeleteEntry(
+                    energy_pb2.DeleteEntryRequest(
+                        key=energy_pb2.EntryKey(
+                            meter_id=args.meter_id,
+                            stream=args.stream,
+                            timestamp_ms=_timestamp_from_milliseconds(args.timestamp_ms),
+                        )
+                    )
+                )
+                out(f"DeleteEntry: ok={delete_reply.ok} message={delete_reply.message}")
+                return 0
+
+            if args.action == "query":
+                start_ms = getattr(args, "start_ms", None)
+                end_ms = getattr(args, "end_ms", None)
+                limit = getattr(args, "limit", 0)
+                if start_ms is None or end_ms is None:
+                    err("--start-ms and --end-ms are required when --action is query")
+                    return 1
+                query_reply = client.QueryRange(
+                    energy_pb2.QueryRangeRequest(
+                        meter_id=args.meter_id,
+                        stream=args.stream,
+                        start_ms=start_ms,
+                        end_ms=end_ms,
+                        limit=limit,
+                    )
+                )
+                out(f"QueryRange: found {len(query_reply.points)} points")
+                for point in query_reply.points:
+                    out(f"  timestamp_ms={point.timestamp_ms} value={point.value}")
+                return 0
+
+            if args.action == "version":
+                version_reply = client.GetVersion(empty_pb2.Empty())
+                out(f"Version: {version_reply.version}")
+                return 0
+
+            # Default to "get"
+            get_reply = client.GetEntry(
+                energy_pb2.GetEntryRequest(
+                    key=energy_pb2.EntryKey(
+                        meter_id=args.meter_id,
+                        stream=args.stream,
+                        timestamp_ms=_timestamp_from_milliseconds(args.timestamp_ms),
+                    )
+                )
+            )
+            out(f"GetEntry: found={get_reply.found}")
+            if get_reply.found:
+                entry_timestamp_ms = get_reply.entry.key.timestamp_ms.ToMilliseconds()
+                out(
+                    "Entry:"
+                    f" meter_id={get_reply.entry.key.meter_id}"
+                    f" stream={get_reply.entry.key.stream}"
+                    f" timestamp_ms={entry_timestamp_ms}"
+                    f" value={get_reply.entry.value}"
+                )
+            return 0
+    except grpc.RpcError as exc:
+        err(f"gRPC request failed: {exc.code().name} {exc.details()}")
+        return 1
+    except grpc.FutureTimeoutError:
+        err(f"Could not connect to gRPC server at {args.target}")
+        return 1
 
 
 class EnergyStoreServicer(energy_pb2_grpc.EnergyStoreServicer):
@@ -130,6 +234,15 @@ class EnergyStoreServicer(energy_pb2_grpc.EnergyStoreServicer):
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser()
     parser.add_argument("--version", action="store_true")
+    parser.add_argument("--target", default="localhost:50051")
+    parser.add_argument("--meter-id", default="demo-meter")
+    parser.add_argument("--stream", default="consumed_kwh")
+    parser.add_argument("--timestamp-ms", type=int, default=1_725_000_000_000)
+    parser.add_argument("--action", choices=["serve", "get", "set", "update", "delete", "query", "version"], default="serve")
+    parser.add_argument("--value", type=float, help="Value for set or update action")
+    parser.add_argument("--start-ms", type=int, help="Start timestamp in milliseconds for query action")
+    parser.add_argument("--end-ms", type=int, help="End timestamp in milliseconds for query action")
+    parser.add_argument("--limit", type=int, default=0, help="Limit number of results for query action (0 = no limit)")
     return parser
 
 
@@ -140,7 +253,7 @@ def serve(
     servicer_factory: Callable[[], EnergyStoreServicer] | None = None,
     port: int | None = None,
     out: OutFn = print,
-) -> None:
+) -> int:
 
     args = args or build_parser().parse_args()
     grpc_server_factory = grpc_server_factory or _default_grpc_server_factory
@@ -148,9 +261,13 @@ def serve(
     servicer_factory = servicer_factory or EnergyStoreServicer
     port = port if port is not None else GRPC_PORT
 
-    if args.version:
+    if getattr(args, "version", False):
         out(APP_VERSION)
-        return
+        return 0
+
+    action = getattr(args, "action", "serve")
+    if action in {"get", "set", "update", "delete", "query", "version"}:
+        return _run_client_action(args, out=out)
 
     grpc_server = grpc_server_factory()
     servicer = servicer_factory()
@@ -159,3 +276,4 @@ def serve(
     grpc_server.start()
     out(f"gRPC EnergyStore running on port {port}")
     grpc_server.wait_for_termination()
+    return 0

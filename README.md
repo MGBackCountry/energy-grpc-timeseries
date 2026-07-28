@@ -84,6 +84,42 @@ or:
 uv run python -m energy_server
 ```
 
+### Run a quick client call through the same entrypoint
+
+Use the same module entrypoint as a simple CLI client by passing `--action`:
+
+#### Get a single entry
+```bash
+uv run python -m energy_server --action get --meter-id demo-meter --stream consumed_kwh --timestamp-ms 1725000000000
+```
+
+#### Set a new entry
+```bash
+uv run python -m energy_server --action set --meter-id demo-meter --stream consumed_kwh --timestamp-ms 1725000000000 --value 12.5
+```
+
+#### Update an existing entry
+```bash
+uv run python -m energy_server --action update --meter-id demo-meter --stream consumed_kwh --timestamp-ms 1725000000000 --value 18.75
+```
+
+#### Delete an entry
+```bash
+uv run python -m energy_server --action delete --meter-id demo-meter --stream consumed_kwh --timestamp-ms 1725000000000
+```
+
+#### Query a range of entries
+```bash
+uv run python -m energy_server --action query --meter-id demo-meter --stream consumed_kwh --start-ms 1725000000000 --end-ms 1725086400000 --limit 10
+```
+
+#### Get server version
+```bash
+uv run python -m energy_server --action version
+```
+
+`scripts/local_client.py` is kept as a compatibility wrapper and forwards arguments to `python -m energy_server`.
+
 The server reads these environment variables:
 
 - `REDIS_HOST` (default: `redis`)
