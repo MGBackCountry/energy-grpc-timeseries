@@ -42,61 +42,73 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--meter-id", default="demo-meter")
     parser.add_argument("--stream", default="consumed_kwh")
     parser.add_argument("--timestamp-ms", type=int, default=1_725_000_000_000)
-    parser.add_argument("--initial-value", type=float, default=12.5)
-    parser.add_argument("--updated-value", type=float, default=18.75)
+    parser.add_argument( "--action", choices=["get", "set", 'update'], default="get")
+    parser.add_argument("--value", type=float, help="Value for set or update action")
     return parser
+
+
+def set_client_entry(args, client: energy_pb2_grpc.EnergyStoreStub):
+    return client.SetEntry(
+        energy_pb2.SetEntryRequest(
+            entry=build_entry(
+                args.meter_id,
+                args.stream,
+                args.timestamp_ms,
+                args.value
+            )
+        )
+    )
+
+def update_client_entry(args, client: energy_pb2_grpc.EnergyStoreStub):
+    return client.UpdateEntry(
+        energy_pb2.UpdateEntryRequest(
+            entry=build_entry(
+                args.meter_id,
+                args.stream,
+                args.timestamp_ms,
+                args.value
+            )
+        )
+    )
+
+def get_client_entry(args, client: energy_pb2_grpc.EnergyStoreStub):
+    return client.GetEntry(
+        key=energy_pb2.EntryKey(
+            meter_id=args.meter_id,
+            stream=args.stream,
+            timestamp_ms=timestamp_from_milliseconds(args.timestamp_ms)
+        )
+    )
 
 
 def main() -> int:
     args = build_parser().parse_args()
+    if args.action in {"set", "update"} and args.value is None:
+        print("--value is required when --action is set or update")
+        return 1
 
     try:
         with grpc.insecure_channel(args.target) as channel:
             grpc.channel_ready_future(channel).result(timeout=5)
             client = energy_pb2_grpc.EnergyStoreStub(channel)
 
-            set_reply = client.SetEntry(
-                energy_pb2.SetEntryRequest(
-                    entry=build_entry(
-                        args.meter_id,
-                        args.stream,
-                        args.timestamp_ms,
-                        args.initial_value,
+            if args.action == "set":
+                set_reply = set_client_entry(args, client)
+                print(f"SetEntry: ok={set_reply.ok} message={set_reply.message}")
+            elif args.action == "update":
+                update_reply = update_client_entry(args, client)
+                print(f"UpdateEntry: ok={update_reply.ok} message={update_reply.message}")
+            elif args.action == "get":
+                get_reply = get_client_entry(args, client)
+                print(f"GetEntry: found={get_reply.found}")
+                if get_reply.found:
+                    print(
+                        "Entry:"
+                        f" meter_id={get_reply.entry.key.meter_id}"
+                        f" stream={get_reply.entry.key.stream}"
+                        f" timestamp_ms={get_reply.entry.key.timestamp_ms}"
+                        f" value={get_reply.entry.value}"
                     )
-                )
-            )
-            print(f"SetEntry: ok={set_reply.ok} message={set_reply.message}")
-
-            update_reply = client.UpdateEntry(
-                energy_pb2.UpdateEntryRequest(
-                    entry=build_entry(
-                        args.meter_id,
-                        args.stream,
-                        args.timestamp_ms,
-                        args.updated_value,
-                    )
-                )
-            )
-            print(f"UpdateEntry: ok={update_reply.ok} message={update_reply.message}")
-
-            get_reply = client.GetEntry(
-                energy_pb2.GetEntryRequest(
-                    key=energy_pb2.EntryKey(
-                        meter_id=args.meter_id,
-                        stream=args.stream,
-                        timestamp_ms=timestamp_from_milliseconds(args.timestamp_ms),
-                    )
-                )
-            )
-            print(f"GetEntry: found={get_reply.found}")
-            if get_reply.found:
-                print(
-                    "Entry:"
-                    f" meter_id={get_reply.entry.key.meter_id}"
-                    f" stream={get_reply.entry.key.stream}"
-                    f" timestamp_ms={get_reply.entry.key.timestamp_ms}"
-                    f" value={get_reply.entry.value}"
-                )
     except grpc.RpcError as exc:
         print(f"gRPC request failed: {exc.code().name} {exc.details()}", file=sys.stderr)
         return 1
