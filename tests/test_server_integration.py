@@ -299,7 +299,7 @@ def test_serve_routes_client_actions_without_starting_server():
         target="localhost:50051",
         meter_id="demo-meter",
         stream="consumed_kwh",
-        timestamp_ms=1_725_000_000_000,
+        timestamp=datetime(2024, 8, 30, 5, 20, tzinfo=UTC),
         value=None,
     )
 
@@ -316,21 +316,65 @@ def test_serve_routes_client_actions_without_starting_server():
 def test_build_parser_includes_client_arguments():
     parser = server.build_parser()
 
-    args = parser.parse_args(["--action", "set", "--value", "42.5"])
+    args = parser.parse_args(
+        ["--action", "set", "--value", "42.5", "--timestamp", "2024-01-15T10:30:00Z"]
+    )
 
     assert args.action == "set"
     assert args.value == pytest.approx(42.5)
     assert args.target == "localhost:50051"
+    assert args.timestamp == datetime(2024, 1, 15, 10, 30, tzinfo=UTC)
+
+
+@pytest.mark.parametrize(
+    "timestamp",
+    ["2024-01-15T10:30:00", "not-a-datetime"],
+)
+def test_build_parser_rejects_invalid_timestamp(timestamp):
+    parser = server.build_parser()
+
+    with pytest.raises(SystemExit):
+        parser.parse_args(["--timestamp", timestamp])
+
+
+def test_client_build_entry_converts_datetime_to_protobuf_timestamp():
+    args = types.SimpleNamespace(
+        meter_id="meter-1",
+        stream="power",
+        timestamp=datetime(2024, 1, 15, 10, 30, tzinfo=UTC),
+        value=42.5,
+    )
+
+    entry = server._client_build_entry(args)
+
+    assert entry.key.timestamp_ms.ToMilliseconds() == 1_705_314_600_000
+
+
+def test_format_timestamp_uses_readable_utc_iso_format():
+    timestamp = server._timestamp_from_milliseconds(1_705_314_600_000)
+
+    assert server._format_timestamp(timestamp) == "2024-01-15T10:30:00Z"
 
 
 def test_build_parser_includes_query_arguments():
     parser = server.build_parser()
 
-    args = parser.parse_args(["--action", "query", "--start-ms", "1000", "--end-ms", "2000", "--limit", "10"])
+    args = parser.parse_args(
+        [
+            "--action",
+            "query",
+            "--start",
+            "2024-01-15T10:30:00Z",
+            "--end",
+            "2024-01-15T11:30:00Z",
+            "--limit",
+            "10",
+        ]
+    )
 
     assert args.action == "query"
-    assert args.start_ms == 1000
-    assert args.end_ms == 2000
+    assert args.start == datetime(2024, 1, 15, 10, 30, tzinfo=UTC)
+    assert args.end == datetime(2024, 1, 15, 11, 30, tzinfo=UTC)
     assert args.limit == 10
 
 
@@ -360,13 +404,52 @@ def test_run_client_action_delete(capsys):
             target="localhost:50051",
             meter_id="meter-1",
             stream="power",
-            timestamp_ms=1000,
+            timestamp=datetime(1970, 1, 1, tzinfo=UTC),
         )
         result = server._run_client_action(args)
 
         assert result == 0
         output = capsys.readouterr().out
         assert "DeleteEntry: ok=True message=deleted" in output
+    finally:
+        grpc.insecure_channel = original_channel
+        grpc.channel_ready_future = original_ready
+        energy_pb2_grpc.EnergyStoreStub = original_stub
+
+
+def test_run_client_action_get_converts_datetime_to_protobuf_timestamp(capsys):
+    client_mock = Mock()
+    client_mock.GetEntry.return_value = Mock(found=False)
+
+    grpc_channel_mock = Mock()
+    grpc_channel_mock.__enter__ = Mock(return_value=grpc_channel_mock)
+    grpc_channel_mock.__exit__ = Mock(return_value=False)
+
+    original_channel = grpc.insecure_channel
+    grpc.insecure_channel = Mock(return_value=grpc_channel_mock)
+
+    original_ready = grpc.channel_ready_future
+    ready_future = Mock()
+    ready_future.result = Mock(return_value=None)
+    grpc.channel_ready_future = Mock(return_value=ready_future)
+
+    original_stub = energy_pb2_grpc.EnergyStoreStub
+    energy_pb2_grpc.EnergyStoreStub = Mock(return_value=client_mock)
+
+    try:
+        args = types.SimpleNamespace(
+            action="get",
+            target="localhost:50051",
+            meter_id="meter-1",
+            stream="power",
+            timestamp=datetime(2024, 1, 15, 10, 30, tzinfo=UTC),
+        )
+        result = server._run_client_action(args)
+
+        assert result == 0
+        request = client_mock.GetEntry.call_args.args[0]
+        assert request.key.timestamp_ms.ToMilliseconds() == 1_705_314_600_000
+        assert "GetEntry: found=False" in capsys.readouterr().out
     finally:
         grpc.insecure_channel = original_channel
         grpc.channel_ready_future = original_ready
@@ -401,13 +484,16 @@ def test_run_client_action_query(capsys):
             target="localhost:50051",
             meter_id="meter-1",
             stream="power",
-            start_ms=1000,
-            end_ms=2000,
+            start=datetime(1970, 1, 1, 0, 0, 1, tzinfo=UTC),
+            end=datetime(1970, 1, 1, 0, 0, 2, tzinfo=UTC),
             limit=0,
         )
         result = server._run_client_action(args)
 
         assert result == 0
+        request = client_mock.QueryRange.call_args.args[0]
+        assert request.start_ms == 1000
+        assert request.end_ms == 2000
         output = capsys.readouterr().out
         assert "QueryRange: found 2 points" in output
         assert "timestamp_ms=1000 value=10.5" in output
@@ -444,7 +530,7 @@ def test_run_client_action_version(capsys):
             target="localhost:50051",
             meter_id="demo-meter",
             stream="consumed_kwh",
-            timestamp_ms=1_725_000_000_000,
+            timestamp=datetime(2024, 8, 30, 5, 20, tzinfo=UTC),
         )
         result = server._run_client_action(args)
 
@@ -457,14 +543,14 @@ def test_run_client_action_version(capsys):
         energy_pb2_grpc.EnergyStoreStub = original_stub
 
 
-def test_run_client_action_query_missing_start_ms():
+def test_run_client_action_query_missing_start():
     args = types.SimpleNamespace(
         action="query",
         target="localhost:50051",
         meter_id="meter-1",
         stream="power",
-        start_ms=None,
-        end_ms=2000,
+        start=None,
+        end=datetime(1970, 1, 1, tzinfo=UTC),
         limit=0,
     )
     
@@ -473,14 +559,14 @@ def test_run_client_action_query_missing_start_ms():
     assert result == 1
 
 
-def test_run_client_action_query_missing_end_ms():
+def test_run_client_action_query_missing_end():
     args = types.SimpleNamespace(
         action="query",
         target="localhost:50051",
         meter_id="meter-1",
         stream="power",
-        start_ms=1000,
-        end_ms=None,
+        start=datetime(1970, 1, 1, tzinfo=UTC),
+        end=None,
         limit=0,
     )
     

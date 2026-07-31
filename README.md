@@ -6,7 +6,7 @@ Each data point is identified by:
 
 - `meter_id`
 - `stream`
-- `timestamp_ms`
+- `EntryKey.timestamp_ms` (a protobuf `Timestamp`)
 
 Examples of streams are `consumed_kwh`, `produced_kwh`, `power`, or `voltage`.
 
@@ -28,7 +28,8 @@ The API contract is defined in `protos/energy.proto`.
 A time series is always scoped to the pair `(meter_id, stream)`. Different streams for the same meter are stored separately.
 
 - `EntryKey.timestamp_ms` accepts a protobuf `Timestamp` date-time (for example, `2024-01-15T10:30:00Z`) and the server converts it to **epoch milliseconds** for storage
-- `start_ms` and `end_ms` use **epoch milliseconds**
+- The protobuf `start_ms` and `end_ms` fields use **epoch milliseconds**; the CLI converts
+  ISO 8601 `--start` and `--end` values to milliseconds before sending the request
 - `start_ms` and `end_ms` are **inclusive**
 - `limit = 0` means no limit
 - Negative limits are currently treated the same as no limit
@@ -86,31 +87,33 @@ uv run python -m energy_server
 
 ### Run a quick client call through the same entrypoint
 
-Use the same module entrypoint as a simple CLI client by passing `--action`:
+Use the same module entrypoint as a simple CLI client by passing `--action`. Single-entry
+actions accept `--timestamp`, and range queries accept `--start` and `--end`, as ISO 8601
+datetimes with a timezone.
 
 #### Get a single entry
 ```bash
-uv run python -m energy_server --action get --meter-id demo-meter --stream consumed_kwh --timestamp-ms 1725000000000
+uv run python -m energy_server --action get --meter-id demo-meter --stream consumed_kwh --timestamp 2024-08-30T05:20:00Z
 ```
 
 #### Set a new entry
 ```bash
-uv run python -m energy_server --action set --meter-id demo-meter --stream consumed_kwh --timestamp-ms 1725000000000 --value 12.5
+uv run python -m energy_server --action set --meter-id demo-meter --stream consumed_kwh --timestamp 2024-08-30T05:20:00Z --value 12.5
 ```
 
 #### Update an existing entry
 ```bash
-uv run python -m energy_server --action update --meter-id demo-meter --stream consumed_kwh --timestamp-ms 1725000000000 --value 18.75
+uv run python -m energy_server --action update --meter-id demo-meter --stream consumed_kwh --timestamp 2024-08-30T05:20:00Z --value 18.75
 ```
 
 #### Delete an entry
 ```bash
-uv run python -m energy_server --action delete --meter-id demo-meter --stream consumed_kwh --timestamp-ms 1725000000000
+uv run python -m energy_server --action delete --meter-id demo-meter --stream consumed_kwh --timestamp 2024-08-30T05:20:00Z
 ```
 
 #### Query a range of entries
 ```bash
-uv run python -m energy_server --action query --meter-id demo-meter --stream consumed_kwh --start-ms 1725000000000 --end-ms 1725086400000 --limit 10
+uv run python -m energy_server --action query --meter-id demo-meter --stream consumed_kwh --start 2024-08-30T05:20:00Z --end 2024-08-31T05:20:00Z --limit 10
 ```
 
 #### Get server version

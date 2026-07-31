@@ -1,6 +1,6 @@
 import argparse
 from concurrent import futures
-from importlib.metadata import PackageNotFoundError, version
+from datetime import UTC, datetime
 import sys
 from typing import Any, Callable, Protocol, TypeAlias
 
@@ -8,6 +8,7 @@ import grpc
 from google.protobuf.timestamp_pb2 import Timestamp
 from google.protobuf import empty_pb2
 
+from . import __version__
 from .config import GRPC_PORT
 from .generated import energy_pb2, energy_pb2_grpc
 from .redis_store import PointConflictError, RedisTimeSeriesStore
@@ -37,10 +38,7 @@ class TimeSeriesStore(Protocol):
         limit: int = 0,
     ) -> list[Point]: ...
 
-try:
-    APP_VERSION = version("energy-grpc-timeseries")
-except PackageNotFoundError:
-    APP_VERSION = "dev"
+APP_VERSION = __version__
 
 
 def _timestamp_to_milliseconds(timestamp: Timestamp) -> int:
@@ -50,6 +48,29 @@ def _timestamp_to_milliseconds(timestamp: Timestamp) -> int:
 def _timestamp_from_milliseconds(timestamp_ms: int) -> Timestamp:
     seconds, milliseconds = divmod(timestamp_ms, 1_000)
     return Timestamp(seconds=seconds, nanos=milliseconds * 1_000_000)
+
+
+def _parse_datetime(value: str) -> datetime:
+    normalized_value = f"{value[:-1]}+00:00" if value.endswith("Z") else value
+    try:
+        timestamp = datetime.fromisoformat(normalized_value)
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError(
+            "must be an ISO 8601 datetime such as 2024-01-15T10:30:00Z"
+        ) from exc
+    if timestamp.tzinfo is None:
+        raise argparse.ArgumentTypeError("must include a timezone, such as Z")
+    return timestamp.astimezone(UTC)
+
+
+def _timestamp_from_datetime(timestamp: datetime) -> Timestamp:
+    protobuf_timestamp = Timestamp()
+    protobuf_timestamp.FromDatetime(timestamp)
+    return protobuf_timestamp
+
+
+def _format_timestamp(timestamp: Timestamp) -> str:
+    return timestamp.ToDatetime(tzinfo=UTC).isoformat().replace("+00:00", "Z")
 
 
 def _build_entry(meter_id: str, stream: str, timestamp_ms: int, value: float) -> energy_pb2.Entry:
@@ -68,7 +89,14 @@ def _default_grpc_server_factory() -> grpc.Server:
 
 
 def _client_build_entry(args: argparse.Namespace) -> energy_pb2.Entry:
-    return _build_entry(args.meter_id, args.stream, args.timestamp_ms, args.value)
+    return energy_pb2.Entry(
+        key=energy_pb2.EntryKey(
+            meter_id=args.meter_id,
+            stream=args.stream,
+            timestamp_ms=_timestamp_from_datetime(args.timestamp),
+        ),
+        value=args.value,
+    )
 
 
 def _run_client_action(
@@ -107,7 +135,7 @@ def _run_client_action(
                         key=energy_pb2.EntryKey(
                             meter_id=args.meter_id,
                             stream=args.stream,
-                            timestamp_ms=_timestamp_from_milliseconds(args.timestamp_ms),
+                            timestamp_ms=_timestamp_from_datetime(args.timestamp),
                         )
                     )
                 )
@@ -115,18 +143,18 @@ def _run_client_action(
                 return 0
 
             if args.action == "query":
-                start_ms = getattr(args, "start_ms", None)
-                end_ms = getattr(args, "end_ms", None)
+                start = getattr(args, "start", None)
+                end = getattr(args, "end", None)
                 limit = getattr(args, "limit", 0)
-                if start_ms is None or end_ms is None:
-                    err("--start-ms and --end-ms are required when --action is query")
+                if start is None or end is None:
+                    err("--start and --end are required when --action is query")
                     return 1
                 query_reply = client.QueryRange(
                     energy_pb2.QueryRangeRequest(
                         meter_id=args.meter_id,
                         stream=args.stream,
-                        start_ms=start_ms,
-                        end_ms=end_ms,
+                        start_ms=_timestamp_to_milliseconds(_timestamp_from_datetime(start)),
+                        end_ms=_timestamp_to_milliseconds(_timestamp_from_datetime(end)),
                         limit=limit,
                     )
                 )
@@ -146,18 +174,17 @@ def _run_client_action(
                     key=energy_pb2.EntryKey(
                         meter_id=args.meter_id,
                         stream=args.stream,
-                        timestamp_ms=_timestamp_from_milliseconds(args.timestamp_ms),
+                        timestamp_ms=_timestamp_from_datetime(args.timestamp),
                     )
                 )
             )
             out(f"GetEntry: found={get_reply.found}")
             if get_reply.found:
-                entry_timestamp_ms = get_reply.entry.key.timestamp_ms.ToMilliseconds()
                 out(
                     "Entry:"
                     f" meter_id={get_reply.entry.key.meter_id}"
                     f" stream={get_reply.entry.key.stream}"
-                    f" timestamp_ms={entry_timestamp_ms}"
+                    f" timestamp={_format_timestamp(get_reply.entry.key.timestamp_ms)}"
                     f" value={get_reply.entry.value}"
                 )
             return 0
@@ -237,11 +264,24 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--target", default="localhost:50051")
     parser.add_argument("--meter-id", default="demo-meter")
     parser.add_argument("--stream", default="consumed_kwh")
-    parser.add_argument("--timestamp-ms", type=int, default=1_725_000_000_000)
+    parser.add_argument(
+        "--timestamp",
+        type=_parse_datetime,
+        default=_parse_datetime("2024-08-30T05:20:00Z"),
+        help="ISO 8601 datetime with timezone for get, set, update, or delete actions",
+    )
     parser.add_argument("--action", choices=["serve", "get", "set", "update", "delete", "query", "version"], default="serve")
     parser.add_argument("--value", type=float, help="Value for set or update action")
-    parser.add_argument("--start-ms", type=int, help="Start timestamp in milliseconds for query action")
-    parser.add_argument("--end-ms", type=int, help="End timestamp in milliseconds for query action")
+    parser.add_argument(
+        "--start",
+        type=_parse_datetime,
+        help="Inclusive ISO 8601 start datetime with timezone for query action",
+    )
+    parser.add_argument(
+        "--end",
+        type=_parse_datetime,
+        help="Inclusive ISO 8601 end datetime with timezone for query action",
+    )
     parser.add_argument("--limit", type=int, default=0, help="Limit number of results for query action (0 = no limit)")
     return parser
 

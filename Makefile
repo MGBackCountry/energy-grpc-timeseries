@@ -4,7 +4,7 @@ SHELL := /bin/bash
 # Core settings
 UV := uv
 PYTHON := python
-MODULE := energy_server
+MODULE := energy_server.server
 
 # Paths
 PROTO_DIR := protos
@@ -51,7 +51,7 @@ $(STAMP): $(PROTO_FILES)
 	@touch $(STAMP)
 
 run:
-	$(UV) run $(PYTHON) -m $(MODULE)
+	PYTHONPATH=$(SRC_DIR) $(UV) run $(PYTHON) -m $(MODULE)
 
 dev: gen-protos run
 
