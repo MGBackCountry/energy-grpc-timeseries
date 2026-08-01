@@ -1,3 +1,3 @@
 from .server import serve
 
-serve()
+raise SystemExit(serve())

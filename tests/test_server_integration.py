@@ -2,9 +2,11 @@ import types
 from datetime import UTC, datetime
 from unittest.mock import Mock
 
+import grpc
 import pytest
 
 from energy_server import server
+from energy_server.generated import energy_pb2_grpc
 from support import FakeRedisStore, make_entry, make_key
 
 
@@ -239,15 +241,17 @@ def test_serve_prints_version_and_does_not_start_server(capsys):
     fake_server = Mock(name="grpc_server")
     grpc_server_factory = Mock(name="grpc_server_factory", return_value=fake_server)
 
-    server.serve(
+    result = server.serve(
         args=types.SimpleNamespace(version=True),
         grpc_server_factory=grpc_server_factory,
         out=print,
     )
 
     output = capsys.readouterr().out.strip()
+    assert result == 0
     assert output == server.APP_VERSION
     grpc_server_factory.assert_not_called()
+
 
 def test_serve_configures_and_starts_grpc_server(capsys):
     fake_store = FakeRedisStore()
@@ -262,7 +266,7 @@ def test_serve_configures_and_starts_grpc_server(capsys):
         added["servicer"] = servicer
         added["grpc_server"] = grpc_server
 
-    server.serve(
+    result = server.serve(
         args=types.SimpleNamespace(version=False),
         grpc_server_factory=grpc_server_factory,
         register_servicer=fake_add_servicer_to_server,
@@ -280,4 +284,292 @@ def test_serve_configures_and_starts_grpc_server(capsys):
     assert added["grpc_server"] is fake_server
 
     output = capsys.readouterr().out.strip()
+    assert result == 0
     assert output == "gRPC EnergyStore running on port 50051"
+
+
+def test_serve_routes_client_actions_without_starting_server():
+    client_runner = Mock(return_value=0)
+    grpc_server_factory = Mock(name="grpc_server_factory")
+    original_runner = server._run_client_action
+    server._run_client_action = client_runner
+    args = types.SimpleNamespace(
+        version=False,
+        action="get",
+        target="localhost:50051",
+        meter_id="demo-meter",
+        stream="consumed_kwh",
+        timestamp=datetime(2024, 8, 30, 5, 20, tzinfo=UTC),
+        value=None,
+    )
+
+    try:
+        result = server.serve(args=args, grpc_server_factory=grpc_server_factory)
+    finally:
+        server._run_client_action = original_runner
+
+    assert result == 0
+    client_runner.assert_called_once_with(args, out=print)
+    grpc_server_factory.assert_not_called()
+
+
+def test_build_parser_includes_client_arguments():
+    parser = server.build_parser()
+
+    args = parser.parse_args(
+        ["--action", "set", "--value", "42.5", "--timestamp", "2024-01-15T10:30:00Z"]
+    )
+
+    assert args.action == "set"
+    assert args.value == pytest.approx(42.5)
+    assert args.target == "localhost:50051"
+    assert args.timestamp == datetime(2024, 1, 15, 10, 30, tzinfo=UTC)
+
+
+@pytest.mark.parametrize(
+    "timestamp",
+    ["2024-01-15T10:30:00", "not-a-datetime"],
+)
+def test_build_parser_rejects_invalid_timestamp(timestamp):
+    parser = server.build_parser()
+
+    with pytest.raises(SystemExit):
+        parser.parse_args(["--timestamp", timestamp])
+
+
+def test_client_build_entry_converts_datetime_to_protobuf_timestamp():
+    args = types.SimpleNamespace(
+        meter_id="meter-1",
+        stream="power",
+        timestamp=datetime(2024, 1, 15, 10, 30, tzinfo=UTC),
+        value=42.5,
+    )
+
+    entry = server._client_build_entry(args)
+
+    assert entry.key.timestamp_ms.ToMilliseconds() == 1_705_314_600_000
+
+
+def test_format_timestamp_uses_readable_utc_iso_format():
+    timestamp = server._timestamp_from_milliseconds(1_705_314_600_000)
+
+    assert server._format_timestamp(timestamp) == "2024-01-15T10:30:00Z"
+
+
+def test_build_parser_includes_query_arguments():
+    parser = server.build_parser()
+
+    args = parser.parse_args(
+        [
+            "--action",
+            "query",
+            "--start",
+            "2024-01-15T10:30:00Z",
+            "--end",
+            "2024-01-15T11:30:00Z",
+            "--limit",
+            "10",
+        ]
+    )
+
+    assert args.action == "query"
+    assert args.start == datetime(2024, 1, 15, 10, 30, tzinfo=UTC)
+    assert args.end == datetime(2024, 1, 15, 11, 30, tzinfo=UTC)
+    assert args.limit == 10
+
+
+def test_run_client_action_delete(capsys):
+    client_mock = Mock()
+    delete_reply = Mock(ok=True, message="deleted")
+    client_mock.DeleteEntry.return_value = delete_reply
+
+    grpc_channel_mock = Mock()
+    grpc_channel_mock.__enter__ = Mock(return_value=grpc_channel_mock)
+    grpc_channel_mock.__exit__ = Mock(return_value=False)
+
+    original_channel = grpc.insecure_channel
+    grpc.insecure_channel = Mock(return_value=grpc_channel_mock)
+
+    original_ready = grpc.channel_ready_future
+    ready_future = Mock()
+    ready_future.result = Mock(return_value=None)
+    grpc.channel_ready_future = Mock(return_value=ready_future)
+
+    original_stub = energy_pb2_grpc.EnergyStoreStub
+    energy_pb2_grpc.EnergyStoreStub = Mock(return_value=client_mock)
+
+    try:
+        args = types.SimpleNamespace(
+            action="delete",
+            target="localhost:50051",
+            meter_id="meter-1",
+            stream="power",
+            timestamp=datetime(1970, 1, 1, tzinfo=UTC),
+        )
+        result = server._run_client_action(args)
+
+        assert result == 0
+        output = capsys.readouterr().out
+        assert "DeleteEntry: ok=True message=deleted" in output
+    finally:
+        grpc.insecure_channel = original_channel
+        grpc.channel_ready_future = original_ready
+        energy_pb2_grpc.EnergyStoreStub = original_stub
+
+
+def test_run_client_action_get_converts_datetime_to_protobuf_timestamp(capsys):
+    client_mock = Mock()
+    client_mock.GetEntry.return_value = Mock(found=False)
+
+    grpc_channel_mock = Mock()
+    grpc_channel_mock.__enter__ = Mock(return_value=grpc_channel_mock)
+    grpc_channel_mock.__exit__ = Mock(return_value=False)
+
+    original_channel = grpc.insecure_channel
+    grpc.insecure_channel = Mock(return_value=grpc_channel_mock)
+
+    original_ready = grpc.channel_ready_future
+    ready_future = Mock()
+    ready_future.result = Mock(return_value=None)
+    grpc.channel_ready_future = Mock(return_value=ready_future)
+
+    original_stub = energy_pb2_grpc.EnergyStoreStub
+    energy_pb2_grpc.EnergyStoreStub = Mock(return_value=client_mock)
+
+    try:
+        args = types.SimpleNamespace(
+            action="get",
+            target="localhost:50051",
+            meter_id="meter-1",
+            stream="power",
+            timestamp=datetime(2024, 1, 15, 10, 30, tzinfo=UTC),
+        )
+        result = server._run_client_action(args)
+
+        assert result == 0
+        request = client_mock.GetEntry.call_args.args[0]
+        assert request.key.timestamp_ms.ToMilliseconds() == 1_705_314_600_000
+        assert "GetEntry: found=False" in capsys.readouterr().out
+    finally:
+        grpc.insecure_channel = original_channel
+        grpc.channel_ready_future = original_ready
+        energy_pb2_grpc.EnergyStoreStub = original_stub
+
+
+def test_run_client_action_query(capsys):
+    client_mock = Mock()
+    point1 = Mock(timestamp_ms=1000, value=10.5)
+    point2 = Mock(timestamp_ms=2000, value=20.5)
+    query_reply = Mock(points=[point1, point2])
+    client_mock.QueryRange.return_value = query_reply
+
+    grpc_channel_mock = Mock()
+    grpc_channel_mock.__enter__ = Mock(return_value=grpc_channel_mock)
+    grpc_channel_mock.__exit__ = Mock(return_value=False)
+
+    original_channel = grpc.insecure_channel
+    grpc.insecure_channel = Mock(return_value=grpc_channel_mock)
+
+    original_ready = grpc.channel_ready_future
+    ready_future = Mock()
+    ready_future.result = Mock(return_value=None)
+    grpc.channel_ready_future = Mock(return_value=ready_future)
+
+    original_stub = energy_pb2_grpc.EnergyStoreStub
+    energy_pb2_grpc.EnergyStoreStub = Mock(return_value=client_mock)
+
+    try:
+        args = types.SimpleNamespace(
+            action="query",
+            target="localhost:50051",
+            meter_id="meter-1",
+            stream="power",
+            start=datetime(1970, 1, 1, 0, 0, 1, tzinfo=UTC),
+            end=datetime(1970, 1, 1, 0, 0, 2, tzinfo=UTC),
+            limit=0,
+        )
+        result = server._run_client_action(args)
+
+        assert result == 0
+        request = client_mock.QueryRange.call_args.args[0]
+        assert request.start_ms == 1000
+        assert request.end_ms == 2000
+        output = capsys.readouterr().out
+        assert "QueryRange: found 2 points" in output
+        assert "timestamp_ms=1000 value=10.5" in output
+        assert "timestamp_ms=2000 value=20.5" in output
+    finally:
+        grpc.insecure_channel = original_channel
+        grpc.channel_ready_future = original_ready
+        energy_pb2_grpc.EnergyStoreStub = original_stub
+
+
+def test_run_client_action_version(capsys):
+    client_mock = Mock()
+    version_reply = Mock(version="1.0.0")
+    client_mock.GetVersion.return_value = version_reply
+
+    grpc_channel_mock = Mock()
+    grpc_channel_mock.__enter__ = Mock(return_value=grpc_channel_mock)
+    grpc_channel_mock.__exit__ = Mock(return_value=False)
+
+    original_channel = grpc.insecure_channel
+    grpc.insecure_channel = Mock(return_value=grpc_channel_mock)
+
+    original_ready = grpc.channel_ready_future
+    ready_future = Mock()
+    ready_future.result = Mock(return_value=None)
+    grpc.channel_ready_future = Mock(return_value=ready_future)
+
+    original_stub = energy_pb2_grpc.EnergyStoreStub
+    energy_pb2_grpc.EnergyStoreStub = Mock(return_value=client_mock)
+
+    try:
+        args = types.SimpleNamespace(
+            action="version",
+            target="localhost:50051",
+            meter_id="demo-meter",
+            stream="consumed_kwh",
+            timestamp=datetime(2024, 8, 30, 5, 20, tzinfo=UTC),
+        )
+        result = server._run_client_action(args)
+
+        assert result == 0
+        output = capsys.readouterr().out
+        assert "Version: 1.0.0" in output
+    finally:
+        grpc.insecure_channel = original_channel
+        grpc.channel_ready_future = original_ready
+        energy_pb2_grpc.EnergyStoreStub = original_stub
+
+
+def test_run_client_action_query_missing_start():
+    args = types.SimpleNamespace(
+        action="query",
+        target="localhost:50051",
+        meter_id="meter-1",
+        stream="power",
+        start=None,
+        end=datetime(1970, 1, 1, tzinfo=UTC),
+        limit=0,
+    )
+    
+    result = server._run_client_action(args, err=lambda x: None)
+    
+    assert result == 1
+
+
+def test_run_client_action_query_missing_end():
+    args = types.SimpleNamespace(
+        action="query",
+        target="localhost:50051",
+        meter_id="meter-1",
+        stream="power",
+        start=datetime(1970, 1, 1, tzinfo=UTC),
+        end=None,
+        limit=0,
+    )
+    
+    result = server._run_client_action(args, err=lambda x: None)
+    
+    assert result == 1
