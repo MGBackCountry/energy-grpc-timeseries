@@ -121,7 +121,14 @@ uv run python -m energy_server --action query --meter-id demo-meter --stream con
 uv run python -m energy_server --action version
 ```
 
-`scripts/local_client.py` is kept as a compatibility wrapper and forwards arguments to `python -m energy_server`.
+`scripts/local_client.py` is a compatibility wrapper that executes the installed
+`energy-server` CLI in the running `energy_server` Compose container. It does not require
+generated protobuf bindings on the host:
+
+```bash
+docker compose up -d
+uv run scripts/local_client.py --version
+```
 
 The server reads these environment variables:
 
