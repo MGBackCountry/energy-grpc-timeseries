@@ -496,8 +496,8 @@ def test_run_client_action_query(capsys):
         assert request.end_ms == 2000
         output = capsys.readouterr().out
         assert "QueryRange: found 2 points" in output
-        assert "timestamp_ms=1000 value=10.5" in output
-        assert "timestamp_ms=2000 value=20.5" in output
+        assert "timestamp=1970-01-01 01:00:01 CET value=10.5" in output
+        assert "timestamp=1970-01-01 01:00:02 CET value=20.5" in output
     finally:
         grpc.insecure_channel = original_channel
         grpc.channel_ready_future = original_ready

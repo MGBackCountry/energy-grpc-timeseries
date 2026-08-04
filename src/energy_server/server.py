@@ -3,6 +3,7 @@ from concurrent import futures
 from datetime import UTC, datetime
 import sys
 from typing import Any, Callable, Protocol, TypeAlias
+from zoneinfo import ZoneInfo
 
 import grpc
 from google.protobuf.timestamp_pb2 import Timestamp
@@ -39,6 +40,7 @@ class TimeSeriesStore(Protocol):
     ) -> list[Point]: ...
 
 APP_VERSION = __version__
+NETHERLANDS_TZ = ZoneInfo("Europe/Amsterdam")
 
 
 def _timestamp_to_milliseconds(timestamp: Timestamp) -> int:
@@ -71,6 +73,12 @@ def _timestamp_from_datetime(timestamp: datetime) -> Timestamp:
 
 def _format_timestamp(timestamp: Timestamp) -> str:
     return timestamp.ToDatetime(tzinfo=UTC).isoformat().replace("+00:00", "Z")
+
+
+def _format_timestamp_ms(timestamp_ms: int) -> str:
+    return datetime.fromtimestamp(timestamp_ms / 1_000, tz=UTC).astimezone(NETHERLANDS_TZ).strftime(
+        "%Y-%m-%d %H:%M:%S %Z"
+    )
 
 
 def _build_entry(meter_id: str, stream: str, timestamp_ms: int, value: float) -> energy_pb2.Entry:
@@ -160,7 +168,7 @@ def _run_client_action(
                 )
                 out(f"QueryRange: found {len(query_reply.points)} points")
                 for point in query_reply.points:
-                    out(f"  timestamp_ms={point.timestamp_ms} value={point.value}")
+                    out(f"  timestamp={_format_timestamp_ms(point.timestamp_ms)} value={point.value}")
                 return 0
 
             if args.action == "version":
