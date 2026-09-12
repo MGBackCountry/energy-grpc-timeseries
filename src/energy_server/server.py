@@ -2,7 +2,8 @@ import argparse
 from concurrent import futures
 from datetime import UTC, datetime
 import sys
-from typing import Any, Callable, Protocol, TypeAlias
+from typing import Any, Protocol, TypeAlias
+from collections.abc import Callable
 from zoneinfo import ZoneInfo
 
 import grpc
@@ -117,85 +118,87 @@ def _run_client_action(
             grpc.channel_ready_future(channel).result(timeout=5)
             client = energy_pb2_grpc.EnergyStoreStub(channel)
 
-            if args.action == "set":
-                if args.value is None:
-                    err("--value is required when --action is set")
-                    return 1
-                set_reply = client.SetEntry(
-                    energy_pb2.SetEntryRequest(entry=_client_build_entry(args))
-                )
-                out(f"SetEntry: ok={set_reply.ok} message={set_reply.message}")
-                return 0
+            match args.action:
+                case "set":
+                    if args.value is None:
+                        err("--value is required when --action is set")
+                        return 1
+                    set_reply = client.SetEntry(
+                        energy_pb2.SetEntryRequest(entry=_client_build_entry(args))
+                    )
+                    out(f"SetEntry: ok={set_reply.ok} message={set_reply.message}")
+                    return 0
 
-            if args.action == "update":
-                if args.value is None:
-                    err("--value is required when --action is update")
-                    return 1
-                update_reply = client.UpdateEntry(
-                    energy_pb2.UpdateEntryRequest(entry=_client_build_entry(args))
-                )
-                out(f"UpdateEntry: ok={update_reply.ok} message={update_reply.message}")
-                return 0
+                case "update":
+                    if args.value is None:
+                        err("--value is required when --action is update")
+                        return 1
+                    update_reply = client.UpdateEntry(
+                        energy_pb2.UpdateEntryRequest(entry=_client_build_entry(args))
+                    )
+                    out(f"UpdateEntry: ok={update_reply.ok} message={update_reply.message}")
+                    return 0
 
-            if args.action == "delete":
-                delete_reply = client.DeleteEntry(
-                    energy_pb2.DeleteEntryRequest(
-                        key=energy_pb2.EntryKey(
-                            meter_id=args.meter_id,
-                            stream=args.stream,
-                            timestamp_ms=_timestamp_from_datetime(args.timestamp),
+                case "delete":
+                    delete_reply = client.DeleteEntry(
+                        energy_pb2.DeleteEntryRequest(
+                            key=energy_pb2.EntryKey(
+                                meter_id=args.meter_id,
+                                stream=args.stream,
+                                timestamp_ms=_timestamp_from_datetime(args.timestamp),
+                            )
                         )
                     )
-                )
-                out(f"DeleteEntry: ok={delete_reply.ok} message={delete_reply.message}")
-                return 0
+                    out(f"DeleteEntry: ok={delete_reply.ok} message={delete_reply.message}")
+                    return 0
 
-            if args.action == "query":
-                start = getattr(args, "start", None)
-                end = getattr(args, "end", None)
-                limit = getattr(args, "limit", 0)
-                if start is None or end is None:
-                    err("--start and --end are required when --action is query")
-                    return 1
-                query_reply = client.QueryRange(
-                    energy_pb2.QueryRangeRequest(
-                        meter_id=args.meter_id,
-                        stream=args.stream,
-                        start_ms=_timestamp_to_milliseconds(_timestamp_from_datetime(start)),
-                        end_ms=_timestamp_to_milliseconds(_timestamp_from_datetime(end)),
-                        limit=limit,
+                case "query":
+                    start = getattr(args, "start", None)
+                    end = getattr(args, "end", None)
+                    limit = getattr(args, "limit", 0)
+                    if start is None or end is None:
+                        err("--start and --end are required when --action is query")
+                        return 1
+                    query_reply = client.QueryRange(
+                        energy_pb2.QueryRangeRequest(
+                            meter_id=args.meter_id,
+                            stream=args.stream,
+                            start_ms=_timestamp_to_milliseconds(_timestamp_from_datetime(start)),
+                            end_ms=_timestamp_to_milliseconds(_timestamp_from_datetime(end)),
+                            limit=limit,
+                        )
                     )
-                )
-                out(f"QueryRange: found {len(query_reply.points)} points")
-                for point in query_reply.points:
-                    out(f"  timestamp={_format_timestamp_ms(point.timestamp_ms)} value={point.value}")
-                return 0
+                    out(f"QueryRange: found {len(query_reply.points)} points")
+                    for point in query_reply.points:
+                        out(f"  timestamp={_format_timestamp_ms(point.timestamp_ms)} value={point.value}")
+                    return 0
 
-            if args.action == "version":
-                version_reply = client.GetVersion(empty_pb2.Empty())
-                out(f"Version: {version_reply.version}")
-                return 0
+                case "version":
+                    version_reply = client.GetVersion(empty_pb2.Empty())
+                    out(f"Version: {version_reply.version}")
+                    return 0
 
-            # Default to "get"
-            get_reply = client.GetEntry(
-                energy_pb2.GetEntryRequest(
-                    key=energy_pb2.EntryKey(
-                        meter_id=args.meter_id,
-                        stream=args.stream,
-                        timestamp_ms=_timestamp_from_datetime(args.timestamp),
+                case _:
+                    # Default to "get".
+                    get_reply = client.GetEntry(
+                        energy_pb2.GetEntryRequest(
+                            key=energy_pb2.EntryKey(
+                                meter_id=args.meter_id,
+                                stream=args.stream,
+                                timestamp_ms=_timestamp_from_datetime(args.timestamp),
+                            )
+                        )
                     )
-                )
-            )
-            out(f"GetEntry: found={get_reply.found}")
-            if get_reply.found:
-                out(
-                    "Entry:"
-                    f" meter_id={get_reply.entry.key.meter_id}"
-                    f" stream={get_reply.entry.key.stream}"
-                    f" timestamp={_format_timestamp(get_reply.entry.key.timestamp_ms)}"
-                    f" value={get_reply.entry.value}"
-                )
-            return 0
+                    out(f"GetEntry: found={get_reply.found}")
+                    if get_reply.found:
+                        out(
+                            "Entry:"
+                            f" meter_id={get_reply.entry.key.meter_id}"
+                            f" stream={get_reply.entry.key.stream}"
+                            f" timestamp={_format_timestamp(get_reply.entry.key.timestamp_ms)}"
+                            f" value={get_reply.entry.value}"
+                        )
+                    return 0
     except grpc.RpcError as exc:
         err(f"gRPC request failed: {exc.code().name} {exc.details()}")
         return 1
