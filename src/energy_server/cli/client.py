@@ -171,6 +171,8 @@ def _run_client_action(
                 case _:
                     err(f"Unsupported action: {args.action}")
                     return 1
+
+            raise AssertionError("unreachable action branch")
     except grpc.RpcError as exc:
         err(f"gRPC request failed: {exc.code().name} {exc.details()}")
         return 1

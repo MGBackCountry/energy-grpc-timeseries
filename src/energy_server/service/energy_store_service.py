@@ -11,24 +11,24 @@ APP_VERSION = __version__
 
 
 class TimeSeriesStore(Protocol):
-    def overwrite_point(self, meter_id: str, stream: str, ts_ms: int, value: float) -> None: ...
+    def overwrite_point(
+        self, meter_id: str, stream: str, ts_ms: int, value: float) -> None: pass
 
-    def create_point_if_absent(self, meter_id: str, stream: str, ts_ms: int, value: float) -> None: ...
+    def create_point_if_absent(
+        self, meter_id: str, stream: str, ts_ms: int, value: float)-> None: pass
 
-    def get_point(self, meter_id: str, stream: str, ts_ms: int) -> float: ...
+    def get_point(
+        self, meter_id: str, stream: str, ts_ms: int) -> float: pass
 
-    def point_exists(self, meter_id: str, stream: str, ts_ms: int) -> bool: ...
+    def point_exists(
+        self, meter_id: str, stream: str, ts_ms: int) -> bool: pass
 
-    def delete_existing_point(self, meter_id: str, stream: str, ts_ms: int) -> bool: ...
+    def delete_existing_point(
+        self, meter_id: str, stream: str, ts_ms: int) -> bool: pass
 
     def get_points_in_range(
-        self,
-        meter_id: str,
-        stream: str,
-        start_ms: int,
-        end_ms: int,
-        limit: int = 0,
-    ) -> list[Point]: ...
+        self, meter_id: str, stream: str, start_ms: int, end_ms: int,
+        limit: int = 0) -> list[Point]: pass
 
 
 def _timestamp_to_milliseconds(timestamp: energy_pb2.Timestamp) -> int:  # type: ignore[name-defined]
