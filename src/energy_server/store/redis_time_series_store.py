@@ -21,7 +21,7 @@ class RedisTimeSeriesStore:
     def _hkey(self, meter_id: str, stream: str) -> str:
         return f"energy:val:{meter_id}:{stream}"
 
-    def set_point(self, meter_id: str, stream: str, ts_ms: int, value: float) -> None:
+    def overwrite_point(self, meter_id: str, stream: str, ts_ms: int, value: float) -> None:
         zkey = self._zkey(meter_id, stream)
         hkey = self._hkey(meter_id, stream)
         ts_field = str(ts_ms)
@@ -30,7 +30,7 @@ class RedisTimeSeriesStore:
         pipe.hset(hkey, ts_field, str(value))
         pipe.execute()
 
-    def set_point_idempotent(self, meter_id: str, stream: str, ts_ms: int, value: float) -> None:
+    def create_point_if_absent(self, meter_id: str, stream: str, ts_ms: int, value: float) -> None:
         zkey = self._zkey(meter_id, stream)
         hkey = self._hkey(meter_id, stream)
         ts_field = str(ts_ms)
@@ -49,7 +49,7 @@ class RedisTimeSeriesStore:
             )
 
         if not hash_exists:
-            self.set_point(meter_id, stream, ts_ms, value)
+            self.overwrite_point(meter_id, stream, ts_ms, value)
             return
 
         if float(existing_value) != float(value):
@@ -83,10 +83,10 @@ class RedisTimeSeriesStore:
 
         return hash_exists
 
-    def exists_point(self, meter_id: str, stream: str, ts_ms: int) -> bool:
+    def point_exists(self, meter_id: str, stream: str, ts_ms: int) -> bool:
         return self._point_presence(meter_id, stream, ts_ms)
 
-    def delete_point(self, meter_id: str, stream: str, ts_ms: int) -> bool:
+    def delete_existing_point(self, meter_id: str, stream: str, ts_ms: int) -> bool:
         if not self._point_presence(meter_id, stream, ts_ms):
             return False
 
@@ -106,7 +106,7 @@ class RedisTimeSeriesStore:
 
         return True
 
-    def query_range(
+    def get_points_in_range(
         self,
         meter_id: str,
         stream: str,
@@ -130,6 +130,9 @@ class RedisTimeSeriesStore:
         points = []
         for ts_str, v in zip(ts_fields, values):
             if v is None:
-                continue
+                raise RedisStoreDriftError(
+                    f"Point value drift for meter_id={meter_id!r}, stream={stream!r}, "
+                    f"timestamp_ms={ts_str}: sorted set entry has no hash value"
+                )
             points.append((int(ts_str), float(v)))
         return points

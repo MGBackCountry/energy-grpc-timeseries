@@ -11,17 +11,17 @@ APP_VERSION = __version__
 
 
 class TimeSeriesStore(Protocol):
-    def set_point(self, meter_id: str, stream: str, ts_ms: int, value: float) -> None: ...
+    def overwrite_point(self, meter_id: str, stream: str, ts_ms: int, value: float) -> None: ...
 
-    def set_point_idempotent(self, meter_id: str, stream: str, ts_ms: int, value: float) -> None: ...
+    def create_point_if_absent(self, meter_id: str, stream: str, ts_ms: int, value: float) -> None: ...
 
     def get_point(self, meter_id: str, stream: str, ts_ms: int) -> float: ...
 
-    def exists_point(self, meter_id: str, stream: str, ts_ms: int) -> bool: ...
+    def point_exists(self, meter_id: str, stream: str, ts_ms: int) -> bool: ...
 
-    def delete_point(self, meter_id: str, stream: str, ts_ms: int) -> bool: ...
+    def delete_existing_point(self, meter_id: str, stream: str, ts_ms: int) -> bool: ...
 
-    def query_range(
+    def get_points_in_range(
         self,
         meter_id: str,
         stream: str,
@@ -70,7 +70,7 @@ class EnergyStoreServicer(energy_pb2_grpc.EnergyStoreServicer):
         k = e.key
         timestamp_ms = _timestamp_to_milliseconds(k.timestamp_ms)
         try:
-            self.store.set_point_idempotent(k.meter_id, k.stream, timestamp_ms, e.value)
+            self.store.create_point_if_absent(k.meter_id, k.stream, timestamp_ms, e.value)
         except PointConflictError:
             return energy_pb2.StatusReply(ok=False, message="conflict")
 
@@ -91,9 +91,9 @@ class EnergyStoreServicer(energy_pb2_grpc.EnergyStoreServicer):
         e = request.entry
         k = e.key
         timestamp_ms = _timestamp_to_milliseconds(k.timestamp_ms)
-        if not self.store.exists_point(k.meter_id, k.stream, timestamp_ms):
+        if not self.store.point_exists(k.meter_id, k.stream, timestamp_ms):
             return energy_pb2.StatusReply(ok=False, message="not_found")
-        self.store.set_point(k.meter_id, k.stream, timestamp_ms, e.value)
+        self.store.overwrite_point(k.meter_id, k.stream, timestamp_ms, e.value)
 
         return energy_pb2.StatusReply(ok=True, message="updated")
 
@@ -101,12 +101,12 @@ class EnergyStoreServicer(energy_pb2_grpc.EnergyStoreServicer):
         del context
         k = request.key
         timestamp_ms = _timestamp_to_milliseconds(k.timestamp_ms)
-        ok = self.store.delete_point(k.meter_id, k.stream, timestamp_ms)
+        ok = self.store.delete_existing_point(k.meter_id, k.stream, timestamp_ms)
         return energy_pb2.StatusReply(ok=ok, message="deleted" if ok else "not_found")
 
     def QueryRange(self, request: Any, context: Any) -> energy_pb2.QueryRangeReply:
         del context
-        pts = self.store.query_range(
+        pts = self.store.get_points_in_range(
             request.meter_id,
             request.stream,
             request.start_ms,

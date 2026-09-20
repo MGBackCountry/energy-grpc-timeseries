@@ -88,6 +88,27 @@ def _run_client_action(
             client = energy_pb2_grpc.EnergyStoreStub(channel)
 
             match args.action:
+                case "get":
+                    get_reply = client.GetEntry(
+                        energy_pb2.GetEntryRequest(
+                            key=energy_pb2.EntryKey(
+                                meter_id=args.meter_id,
+                                stream=args.stream,
+                                timestamp_ms=_timestamp_from_datetime(args.timestamp),
+                            )
+                        )
+                    )
+                    out(f"GetEntry: found={get_reply.found}")
+                    if get_reply.found:
+                        out(
+                            "Entry:"
+                            f" meter_id={get_reply.entry.key.meter_id}"
+                            f" stream={get_reply.entry.key.stream}"
+                            f" timestamp={_format_timestamp(get_reply.entry.key.timestamp_ms)}"
+                            f" value={get_reply.entry.value}"
+                        )
+                    return 0
+
                 case "set":
                     if args.value is None:
                         err("--value is required when --action is set")
@@ -148,25 +169,8 @@ def _run_client_action(
                     return 0
 
                 case _:
-                    get_reply = client.GetEntry(
-                        energy_pb2.GetEntryRequest(
-                            key=energy_pb2.EntryKey(
-                                meter_id=args.meter_id,
-                                stream=args.stream,
-                                timestamp_ms=_timestamp_from_datetime(args.timestamp),
-                            )
-                        )
-                    )
-                    out(f"GetEntry: found={get_reply.found}")
-                    if get_reply.found:
-                        out(
-                            "Entry:"
-                            f" meter_id={get_reply.entry.key.meter_id}"
-                            f" stream={get_reply.entry.key.stream}"
-                            f" timestamp={_format_timestamp(get_reply.entry.key.timestamp_ms)}"
-                            f" value={get_reply.entry.value}"
-                        )
-                    return 0
+                    err(f"Unsupported action: {args.action}")
+                    return 1
     except grpc.RpcError as exc:
         err(f"gRPC request failed: {exc.code().name} {exc.details()}")
         return 1
