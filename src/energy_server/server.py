@@ -1,7 +1,6 @@
 import argparse
 from collections.abc import Callable
 from concurrent import futures
-import sys
 from typing import Any
 
 import grpc
