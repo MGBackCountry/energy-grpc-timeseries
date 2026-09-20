@@ -20,6 +20,7 @@ tests/
 # Generated gRPC files (important!)
 src/energy_server/generated/*.py
 !src/energy_server/generated/__init__.py
+src/energy_server/generated/.protos.stamp
 
 # Env files
 .env

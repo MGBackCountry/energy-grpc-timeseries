@@ -23,9 +23,10 @@ COPY Makefile /app/
 COPY protos/ /app/protos/
 COPY --exclude=src/generated src/ /app/src/
 
-# Create generated package directory
+# Create generated package directory (force regeneration, ignore any stray stamp)
 RUN mkdir -p /app/src/energy_server/generated \
-    && touch /app/src/energy_server/generated/__init__.py
+    && touch /app/src/energy_server/generated/__init__.py \
+    && rm -f /app/src/energy_server/generated/.protos.stamp
 
 # Generate gRPC code
 # This layer is only invalidated if:
