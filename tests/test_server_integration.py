@@ -89,7 +89,7 @@ def test_get_entry_returns_found_false_when_missing(servicer):
 
 
 def test_get_entry_returns_entry_when_present(servicer):
-    servicer.store.set_point("m-1", "power", 1000, 42.25)
+    servicer.store.overwrite_point("m-1", "power", 1000, 42.25)
     request = types.SimpleNamespace(
         key=make_key(meter_id="m-1", stream="power", timestamp_ms=1000)
     )
@@ -115,7 +115,7 @@ def test_update_entry_returns_not_found_when_entry_missing(servicer):
 
 
 def test_update_entry_overwrites_existing_value(servicer):
-    servicer.store.set_point("m-1", "power", 1000, 10.0)
+    servicer.store.overwrite_point("m-1", "power", 1000, 10.0)
     request = types.SimpleNamespace(
         entry=make_entry(meter_id="m-1", stream="power", timestamp_ms=1000, value=55.0)
     )
@@ -139,7 +139,7 @@ def test_delete_entry_returns_not_found_when_missing(servicer):
 
 
 def test_delete_entry_removes_existing_value(servicer):
-    servicer.store.set_point("m-1", "power", 1000, 10.0)
+    servicer.store.overwrite_point("m-1", "power", 1000, 10.0)
     request = types.SimpleNamespace(
         key=make_key(meter_id="m-1", stream="power", timestamp_ms=1000)
     )
@@ -151,11 +151,11 @@ def test_delete_entry_removes_existing_value(servicer):
     assert servicer.store.get_point("m-1", "power", 1000) is None
 
 
-def test_query_range_returns_points_in_requested_window(servicer):
-    servicer.store.set_point("m-1", "power", 1000, 10.0)
-    servicer.store.set_point("m-1", "power", 2000, 20.0)
-    servicer.store.set_point("m-1", "power", 3000, 30.0)
-    servicer.store.set_point("m-1", "voltage", 2000, 230.0)
+def test_get_points_in_range_returns_points_in_requested_window(servicer):
+    servicer.store.overwrite_point("m-1", "power", 1000, 10.0)
+    servicer.store.overwrite_point("m-1", "power", 2000, 20.0)
+    servicer.store.overwrite_point("m-1", "power", 3000, 30.0)
+    servicer.store.overwrite_point("m-1", "voltage", 2000, 230.0)
 
     request = types.SimpleNamespace(
         meter_id="m-1",
@@ -174,10 +174,10 @@ def test_query_range_returns_points_in_requested_window(servicer):
     assert reply.points[1].value == pytest.approx(30.0)
 
 
-def test_query_range_applies_limit(servicer):
-    servicer.store.set_point("m-1", "power", 1000, 10.0)
-    servicer.store.set_point("m-1", "power", 2000, 20.0)
-    servicer.store.set_point("m-1", "power", 3000, 30.0)
+def test_get_points_in_range_applies_limit(servicer):
+    servicer.store.overwrite_point("m-1", "power", 1000, 10.0)
+    servicer.store.overwrite_point("m-1", "power", 2000, 20.0)
+    servicer.store.overwrite_point("m-1", "power", 3000, 30.0)
 
     request = types.SimpleNamespace(
         meter_id="m-1",
@@ -196,10 +196,10 @@ def test_query_range_applies_limit(servicer):
     assert reply.points[1].value == pytest.approx(20.0)
 
 
-def test_query_range_includes_start_and_end_boundaries(servicer):
-    servicer.store.set_point("m-1", "power", 1000, 10.0)
-    servicer.store.set_point("m-1", "power", 2000, 20.0)
-    servicer.store.set_point("m-1", "power", 3000, 30.0)
+def test_get_points_in_range_includes_start_and_end_boundaries(servicer):
+    servicer.store.overwrite_point("m-1", "power", 1000, 10.0)
+    servicer.store.overwrite_point("m-1", "power", 2000, 20.0)
+    servicer.store.overwrite_point("m-1", "power", 3000, 30.0)
 
     request = types.SimpleNamespace(
         meter_id="m-1",
@@ -218,10 +218,10 @@ def test_query_range_includes_start_and_end_boundaries(servicer):
     ]
 
 
-def test_query_range_treats_negative_limit_as_unlimited(servicer):
-    servicer.store.set_point("m-1", "power", 1000, 10.0)
-    servicer.store.set_point("m-1", "power", 2000, 20.0)
-    servicer.store.set_point("m-1", "power", 3000, 30.0)
+def test_get_points_in_range_treats_negative_limit_as_unlimited(servicer):
+    servicer.store.overwrite_point("m-1", "power", 1000, 10.0)
+    servicer.store.overwrite_point("m-1", "power", 2000, 20.0)
+    servicer.store.overwrite_point("m-1", "power", 3000, 30.0)
 
     request = types.SimpleNamespace(
         meter_id="m-1",
@@ -496,8 +496,8 @@ def test_run_client_action_query(capsys):
         assert request.end_ms == 2000
         output = capsys.readouterr().out
         assert "QueryRange: found 2 points" in output
-        assert "timestamp_ms=1000 value=10.5" in output
-        assert "timestamp_ms=2000 value=20.5" in output
+        assert "timestamp=1970-01-01 01:00:01 CET value=10.5" in output
+        assert "timestamp=1970-01-01 01:00:02 CET value=20.5" in output
     finally:
         grpc.insecure_channel = original_channel
         grpc.channel_ready_future = original_ready

@@ -137,7 +137,7 @@ class TestGrpcClientIntegration:
         value = 42.5
 
         # Set data directly in the store
-        fake_store.set_point(meter_id, stream, timestamp_ms, value)
+        fake_store.overwrite_point(meter_id, stream, timestamp_ms, value)
 
         # Retrieve via gRPC
         request = energy_pb2.GetEntryRequest(
@@ -178,7 +178,7 @@ class TestGrpcClientIntegration:
         stream = "produced_kwh"
 
         # Set initial value
-        fake_store.set_point(meter_id, stream, timestamp_ms, 10.0)
+        fake_store.overwrite_point(meter_id, stream, timestamp_ms, 10.0)
 
         # Update via gRPC
         request = energy_pb2.UpdateEntryRequest(
@@ -234,7 +234,7 @@ class TestGrpcClientIntegration:
         stream = "consumed_kwh"
 
         # Set initial value
-        fake_store.set_point(meter_id, stream, timestamp_ms, 42.5)
+        fake_store.overwrite_point(meter_id, stream, timestamp_ms, 42.5)
 
         # Delete via gRPC
         request = energy_pb2.DeleteEntryRequest(
@@ -276,7 +276,7 @@ class TestGrpcClientIntegration:
         assert response.ok is False
         assert response.message == "not_found"
 
-    def test_query_range_with_real_meter_data(self, client, grpc_server_and_channel):
+    def test_get_points_in_range_with_real_meter_data(self, client, grpc_server_and_channel):
         """Test QueryRange RPC with realistic energy meter dataset."""
         _, _, fake_store = grpc_server_and_channel
 
@@ -319,7 +319,7 @@ class TestGrpcClientIntegration:
         # Populate fake store with hourly data
         for hour, consumption in enumerate(hourly_consumption):
             timestamp = base_timestamp + (hour * 3600 * 1000)  # Convert to milliseconds
-            fake_store.set_point(meter_id, stream, timestamp, consumption)
+            fake_store.overwrite_point(meter_id, stream, timestamp, consumption)
 
         # Query the entire day
         start_timestamp = base_timestamp
@@ -354,7 +354,7 @@ class TestGrpcClientIntegration:
         total_consumption = sum(point.value for point in response.points)
         assert total_consumption == pytest.approx(sum(hourly_consumption))
 
-    def test_query_range_with_limit(self, client, grpc_server_and_channel):
+    def test_get_points_in_range_with_limit(self, client, grpc_server_and_channel):
         """Test QueryRange with limit parameter."""
         _, _, fake_store = grpc_server_and_channel
 
@@ -365,7 +365,7 @@ class TestGrpcClientIntegration:
         # Add 10 data points
         for i in range(10):
             timestamp = base_timestamp + (i * 3600 * 1000)
-            fake_store.set_point(meter_id, stream, timestamp, float(i + 1) * 0.5)
+            fake_store.overwrite_point(meter_id, stream, timestamp, float(i + 1) * 0.5)
 
         # Query with limit=5
         request = energy_pb2.QueryRangeRequest(
@@ -382,15 +382,15 @@ class TestGrpcClientIntegration:
         assert response.points[0].value == pytest.approx(0.5)
         assert response.points[4].value == pytest.approx(2.5)
 
-    def test_query_range_includes_boundary_timestamps(self, client, grpc_server_and_channel):
+    def test_get_points_in_range_includes_boundary_timestamps(self, client, grpc_server_and_channel):
         """Test QueryRange includes points exactly on both boundaries."""
         _, _, fake_store = grpc_server_and_channel
 
         meter_id = "home-meter-003"
         stream = "consumed_kwh"
-        fake_store.set_point(meter_id, stream, 1000, 1.0)
-        fake_store.set_point(meter_id, stream, 2000, 2.0)
-        fake_store.set_point(meter_id, stream, 3000, 3.0)
+        fake_store.overwrite_point(meter_id, stream, 1000, 1.0)
+        fake_store.overwrite_point(meter_id, stream, 2000, 2.0)
+        fake_store.overwrite_point(meter_id, stream, 3000, 3.0)
 
         request = energy_pb2.QueryRangeRequest(
             meter_id=meter_id,
@@ -408,14 +408,14 @@ class TestGrpcClientIntegration:
             (3000, pytest.approx(3.0)),
         ]
 
-    def test_query_range_negative_limit_behaves_as_unlimited(self, client, grpc_server_and_channel):
+    def test_get_points_in_range_negative_limit_behaves_as_unlimited(self, client, grpc_server_and_channel):
         """Test QueryRange treats negative limits like no limit."""
         _, _, fake_store = grpc_server_and_channel
 
         meter_id = "home-meter-004"
         stream = "produced_kwh"
         for index, value in enumerate((0.5, 1.0, 1.5), start=1):
-            fake_store.set_point(meter_id, stream, index * 1000, value)
+            fake_store.overwrite_point(meter_id, stream, index * 1000, value)
 
         request = energy_pb2.QueryRangeRequest(
             meter_id=meter_id,
@@ -430,7 +430,7 @@ class TestGrpcClientIntegration:
         assert len(response.points) == 3
         assert [point.timestamp_ms for point in response.points] == [1000, 2000, 3000]
 
-    def test_query_range_empty_result(self, client):
+    def test_get_points_in_range_empty_result(self, client):
         """Test QueryRange returns empty list when no data matches."""
         request = energy_pb2.QueryRangeRequest(
             meter_id="nonexistent-meter",

@@ -12,10 +12,10 @@ class FakeRedisStore:
     def _key(self, meter_id: str, stream: str, ts_ms: int) -> tuple[str, str, int]:
         return meter_id, stream, ts_ms
 
-    def set_point(self, meter_id: str, stream: str, ts_ms: int, value: float) -> None:
+    def overwrite_point(self, meter_id: str, stream: str, ts_ms: int, value: float) -> None:
         self.data[self._key(meter_id, stream, ts_ms)] = float(value)
 
-    def set_point_idempotent(self, meter_id: str, stream: str, ts_ms: int, value: float) -> None:
+    def create_point_if_absent(self, meter_id: str, stream: str, ts_ms: int, value: float) -> None:
         key = self._key(meter_id, stream, ts_ms)
         if key not in self.data:
             self.data[key] = float(value)
@@ -30,13 +30,13 @@ class FakeRedisStore:
     def get_point(self, meter_id: str, stream: str, ts_ms: int) -> float | None:
         return self.data.get(self._key(meter_id, stream, ts_ms))
 
-    def exists_point(self, meter_id: str, stream: str, ts_ms: int) -> bool:
+    def point_exists(self, meter_id: str, stream: str, ts_ms: int) -> bool:
         return self._key(meter_id, stream, ts_ms) in self.data
 
-    def delete_point(self, meter_id: str, stream: str, ts_ms: int) -> bool:
+    def delete_existing_point(self, meter_id: str, stream: str, ts_ms: int) -> bool:
         return self.data.pop(self._key(meter_id, stream, ts_ms), None) is not None
 
-    def query_range(
+    def get_points_in_range(
         self,
         meter_id: str,
         stream: str,
