@@ -18,9 +18,9 @@ __pycache__/
 tests/
 
 # Generated gRPC files (important!)
-src/energy_server/generated/*.py
-!src/energy_server/generated/__init__.py
-src/energy_server/generated/.protos.stamp
+src/grpc_timeseries/generated/*.py
+!src/grpc_timeseries/generated/__init__.py
+src/grpc_timeseries/generated/.protos.stamp
 
 # Env files
 .env

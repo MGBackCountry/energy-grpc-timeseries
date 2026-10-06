@@ -1,5 +1,5 @@
-from energy_server.generated import energy_pb2
-from energy_server.redis_store import PointConflictError
+from grpc_timeseries.generated import energy_pb2
+from grpc_timeseries.redis_store import PointConflictError
 from google.protobuf.timestamp_pb2 import Timestamp
 
 

@@ -17,8 +17,8 @@ def main() -> int:
         "compose",
         "exec",
         "-T",
-        "energy_server",
-        "energy-server",
+        "grpc-timeseries",
+        "grpc-timeseries",
         *forwarded_args,
     ]
     return subprocess.call(command, cwd=repo_root)

@@ -2,7 +2,7 @@ from unittest.mock import Mock
 
 import pytest
 
-from energy_server.redis_store import PointConflictError, RedisStoreDriftError, RedisTimeSeriesStore
+from grpc_timeseries.redis_store import PointConflictError, RedisStoreDriftError, RedisTimeSeriesStore
 
 
 def test_get_points_in_range_applies_limit_in_redis_call():

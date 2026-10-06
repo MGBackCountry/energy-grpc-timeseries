@@ -5,8 +5,8 @@ from unittest.mock import Mock
 import grpc
 import pytest
 
-from energy_server import server
-from energy_server.generated import energy_pb2_grpc
+from grpc_timeseries import server
+from grpc_timeseries.generated import energy_pb2_grpc
 from support import FakeRedisStore, make_entry, make_key
 
 

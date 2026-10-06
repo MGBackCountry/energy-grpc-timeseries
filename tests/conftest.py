@@ -1,6 +1,6 @@
 import pytest
 
-from energy_server import server
+from grpc_timeseries import server
 from support import FakeRedisStore
 
 

@@ -4,16 +4,16 @@ SHELL := /bin/bash
 # Core settings
 UV := uv
 PYTHON := python
-MODULE := energy_server.server
+MODULE := grpc_timeseries.server
 
 # Paths
 PROTO_DIR := protos
-GEN_DIR := src/energy_server/generated
+GEN_DIR := src/grpc_timeseries/generated
 STAMP := $(GEN_DIR)/.protos.stamp
 PROTO_FILES := $(wildcard $(PROTO_DIR)/*.proto)
 
 # Docker
-DOCKER_IMAGE := energy-server
+DOCKER_IMAGE := grpc-timeseries
 DOCKERFILE := docker/Dockerfile.python
 
 .PHONY: help install gen-protos run dev watch clean \

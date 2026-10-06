@@ -6,8 +6,8 @@ from datetime import UTC, datetime, timedelta
 import grpc
 import pytest
 
-from energy_server import server
-from energy_server.generated import energy_pb2, energy_pb2_grpc
+from grpc_timeseries import server
+from grpc_timeseries.generated import energy_pb2, energy_pb2_grpc
 from google.protobuf import empty_pb2
 
 from support import FakeRedisStore

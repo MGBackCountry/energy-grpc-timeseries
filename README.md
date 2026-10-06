@@ -1,4 +1,4 @@
-# energy-grpc-timeseries
+# grpc-timeseries
 
 Small Python gRPC service for storing and querying energy time-series data in Redis.
 
@@ -58,9 +58,9 @@ Range queries read timestamps from the sorted set and then fetch matching values
 | Path | Purpose |
 | --- | --- |
 | `protos/energy.proto` | gRPC and protobuf contract |
-| `src/energy_server/server.py` | gRPC servicer and server startup |
-| `src/energy_server/redis_store.py` | Redis-backed time-series storage |
-| `src/energy_server/generated/` | checked-in generated protobuf/gRPC bindings |
+| `src/grpc_timeseries/server.py` | gRPC servicer and server startup |
+| `src/grpc_timeseries/redis_store.py` | Redis-backed time-series storage |
+| `src/grpc_timeseries/generated/` | checked-in generated protobuf/gRPC bindings |
 | `tests/test_server_integration.py` | fast servicer tests using a fake store |
 | `tests/test_grpc_client_integration.py` | real gRPC client/server integration tests |
 | `tests/test_redis_store.py` | focused Redis store behavior tests |
@@ -82,7 +82,7 @@ make run
 or:
 
 ```bash
-uv run python -m energy_server
+uv run python -m grpc_timeseries
 ```
 
 ### Run a quick client call through the same entrypoint
@@ -93,36 +93,36 @@ datetimes with a timezone.
 
 #### Get a single entry
 ```bash
-uv run python -m energy_server --action get --meter-id demo-meter --stream consumed_kwh --timestamp 2024-08-30T05:20:00Z
+uv run python -m grpc_timeseries --action get --meter-id demo-meter --stream consumed_kwh --timestamp 2024-08-30T05:20:00Z
 ```
 
 #### Set a new entry
 ```bash
-uv run python -m energy_server --action set --meter-id demo-meter --stream consumed_kwh --timestamp 2024-08-30T05:20:00Z --value 12.5
+uv run python -m grpc_timeseries --action set --meter-id demo-meter --stream consumed_kwh --timestamp 2024-08-30T05:20:00Z --value 12.5
 ```
 
 #### Update an existing entry
 ```bash
-uv run python -m energy_server --action update --meter-id demo-meter --stream consumed_kwh --timestamp 2024-08-30T05:20:00Z --value 18.75
+uv run python -m grpc_timeseries --action update --meter-id demo-meter --stream consumed_kwh --timestamp 2024-08-30T05:20:00Z --value 18.75
 ```
 
 #### Delete an entry
 ```bash
-uv run python -m energy_server --action delete --meter-id demo-meter --stream consumed_kwh --timestamp 2024-08-30T05:20:00Z
+uv run python -m grpc_timeseries --action delete --meter-id demo-meter --stream consumed_kwh --timestamp 2024-08-30T05:20:00Z
 ```
 
 #### Query a range of entries
 ```bash
-uv run python -m energy_server --action query --meter-id demo-meter --stream consumed_kwh --start 2024-08-30T05:20:00Z --end 2024-08-31T05:20:00Z --limit 10
+uv run python -m grpc_timeseries --action query --meter-id demo-meter --stream consumed_kwh --start 2024-08-30T05:20:00Z --end 2024-08-31T05:20:00Z --limit 10
 ```
 
 #### Get server version
 ```bash
-uv run python -m energy_server --action version
+uv run python -m grpc_timeseries --action version
 ```
 
 `scripts/local_client.py` is a compatibility wrapper that executes the installed
-`energy-server` CLI in the running `energy_server` Compose container. It does not require
+`grpc-timeseries` CLI in the running `grpc-timeseries` Compose container. It does not require
 generated protobuf bindings on the host:
 
 ```bash
@@ -144,7 +144,7 @@ After editing `protos/*.proto`, regenerate the Python bindings:
 make gen-protos
 ```
 
-Generated code is written to `src/energy_server/generated/`.
+Generated code is written to `src/grpc_timeseries/generated/`.
 
 ## Testing
 
@@ -173,7 +173,7 @@ docker compose up
 Build the Python service image:
 
 ```bash
-docker build -f docker/Dockerfile.python -t energy-server .
+docker build -f docker/Dockerfile.python -t grpc-timeseries .
 ```
 
 ## Notes on tests

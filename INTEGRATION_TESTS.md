@@ -1,6 +1,6 @@
 # gRPC Client Integration Tests
 
-This document describes the real gRPC client integration tests for the energy-grpc-timeseries service.
+This document describes the real gRPC client integration tests for the grpc-timeseries service.
 
 ## Overview
 
@@ -176,7 +176,7 @@ python -m pytest tests/ -v
 
 ### Run with coverage:
 ```bash
-python -m pytest tests/test_grpc_client_integration.py --cov=energy_server --cov-report=html
+python -m pytest tests/test_grpc_client_integration.py --cov=grpc_timeseries --cov-report=html
 ```
 
 ## Key Features

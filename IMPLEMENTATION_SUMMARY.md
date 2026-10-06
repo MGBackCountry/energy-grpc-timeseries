@@ -1,7 +1,7 @@
 # Integration Test Implementation Summary
 
 ## Overview
-Created comprehensive real gRPC client integration tests for the energy-grpc-timeseries service. These tests validate the complete gRPC stack with real client-server communication and realistic energy meter data.
+Created comprehensive real gRPC client integration tests for the grpc-timeseries service. These tests validate the complete gRPC stack with real client-server communication and realistic energy meter data.
 
 ## What Was Implemented
 
@@ -127,7 +127,7 @@ python -m pytest tests/test_grpc_client_integration.py::TestGrpcClientIntegratio
 python -m pytest tests/ -v
 
 # Run with coverage
-python -m pytest tests/ --cov=energy_server --cov-report=html
+python -m pytest tests/ --cov=grpc_timeseries --cov-report=html
 ```
 
 ## Key Features
@@ -150,7 +150,7 @@ python -m pytest tests/ --cov=energy_server --cov-report=html
 | `tests/test_grpc_client_integration.py` | ✨ Created | 12 new integration tests |
 | `INTEGRATION_TESTS.md` | ✨ Created | Comprehensive test documentation |
 | `protos/energy.proto` | 🔄 Updated | Uncommented QueryRange RPC |
-| `src/energy_server/generated/` | 🔄 Regenerated | Updated proto bindings |
+| `src/grpc_timeseries/generated/` | 🔄 Regenerated | Updated proto bindings |
 
 ## Integration with Existing Tests
 
