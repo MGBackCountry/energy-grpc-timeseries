@@ -27,9 +27,9 @@ Tests setting energy meter data via the `SetEntry` RPC.
 
 ```python
 # Store 42.5 kWh consumption at a specific timestamp
-request = energy_pb2.SetEntryRequest(
-    entry=energy_pb2.Entry(
-        key=energy_pb2.EntryKey(
+request = timeseries_pb2.SetEntryRequest(
+    entry=timeseries_pb2.Entry(
+        key=timeseries_pb2.EntryKey(
             meter_id="home-meter-001",
             stream="consumed_kwh",
             timestamp_ms=1705318200000,
@@ -46,8 +46,8 @@ Tests retrieving a single energy meter data point via `GetEntry` RPC.
 
 ```python
 # Retrieve previously stored consumption data
-request = energy_pb2.GetEntryRequest(
-    key=energy_pb2.EntryKey(
+request = timeseries_pb2.GetEntryRequest(
+    key=timeseries_pb2.EntryKey(
         meter_id="home-meter-001",
         stream="consumed_kwh",
         timestamp_ms=1705318200000,
@@ -66,9 +66,9 @@ Tests updating existing meter data via `UpdateEntry` RPC.
 
 ```python
 # Update solar production value from 10.0 to 25.5 kWh
-request = energy_pb2.UpdateEntryRequest(
-    entry=energy_pb2.Entry(
-        key=energy_pb2.EntryKey(meter_id="home-meter-001", stream="produced_kwh", ...),
+request = timeseries_pb2.UpdateEntryRequest(
+    entry=timeseries_pb2.Entry(
+        key=timeseries_pb2.EntryKey(meter_id="home-meter-001", stream="produced_kwh", ...),
         value=25.5,
     )
 )
@@ -126,7 +126,7 @@ Tests the `QueryRange` RPC with a limit parameter.
 
 ```python
 # Add 10 data points, query with limit=5
-request = energy_pb2.QueryRangeRequest(
+request = timeseries_pb2.QueryRangeRequest(
     meter_id="home-meter-002",
     stream="produced_kwh",
     start_ms=base_timestamp,
@@ -219,7 +219,7 @@ Test → gRPC Client Stub
            ↓ (synchronous channel)
         gRPC Server
            ↓
-     EnergyStoreServicer
+     TimeSeriesServicer
            ↓
       FakeRedisStore (in-memory)
 ```

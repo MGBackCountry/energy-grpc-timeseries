@@ -8,8 +8,8 @@ from google.protobuf import empty_pb2
 from google.protobuf.timestamp_pb2 import Timestamp
 
 from .. import __version__
-from ..generated import energy_pb2, energy_pb2_grpc
-from ..service.energy_store_service import APP_VERSION
+from ..generated import timeseries_pb2, timeseries_pb2_grpc
+from ..service.timeseries_store import APP_VERSION
 
 NETHERLANDS_TZ = ZoneInfo("Europe/Amsterdam")
 
@@ -55,9 +55,9 @@ def _format_timestamp_ms(timestamp_ms: int) -> str:
     )
 
 
-def _build_entry(meter_id: str, stream: str, timestamp_ms: int, value: float) -> energy_pb2.Entry:
-    return energy_pb2.Entry(
-        key=energy_pb2.EntryKey(
+def _build_entry(meter_id: str, stream: str, timestamp_ms: int, value: float) -> timeseries_pb2.Entry:
+    return timeseries_pb2.Entry(
+        key=timeseries_pb2.EntryKey(
             meter_id=meter_id,
             stream=stream,
             timestamp_ms=_timestamp_from_milliseconds(timestamp_ms),
@@ -66,9 +66,9 @@ def _build_entry(meter_id: str, stream: str, timestamp_ms: int, value: float) ->
     )
 
 
-def _client_build_entry(args: argparse.Namespace) -> energy_pb2.Entry:
-    return energy_pb2.Entry(
-        key=energy_pb2.EntryKey(
+def _client_build_entry(args: argparse.Namespace) -> timeseries_pb2.Entry:
+    return timeseries_pb2.Entry(
+        key=timeseries_pb2.EntryKey(
             meter_id=args.meter_id,
             stream=args.stream,
             timestamp_ms=_timestamp_from_datetime(args.timestamp),
@@ -85,13 +85,13 @@ def _run_client_action(
     try:
         with grpc.insecure_channel(args.target) as channel:
             grpc.channel_ready_future(channel).result(timeout=5)
-            client = energy_pb2_grpc.EnergyStoreStub(channel)
+            client = timeseries_pb2_grpc.EnergyStoreStub(channel)
 
             match args.action:
                 case "get":
                     get_reply = client.GetEntry(
-                        energy_pb2.GetEntryRequest(
-                            key=energy_pb2.EntryKey(
+                        timeseries_pb2.GetEntryRequest(
+                            key=timeseries_pb2.EntryKey(
                                 meter_id=args.meter_id,
                                 stream=args.stream,
                                 timestamp_ms=_timestamp_from_datetime(args.timestamp),
@@ -114,7 +114,7 @@ def _run_client_action(
                         err("--value is required when --action is set")
                         return 1
                     set_reply = client.SetEntry(
-                        energy_pb2.SetEntryRequest(entry=_client_build_entry(args))
+                        timeseries_pb2.SetEntryRequest(entry=_client_build_entry(args))
                     )
                     out(f"SetEntry: ok={set_reply.ok} message={set_reply.message}")
                     return 0
@@ -124,15 +124,15 @@ def _run_client_action(
                         err("--value is required when --action is update")
                         return 1
                     update_reply = client.UpdateEntry(
-                        energy_pb2.UpdateEntryRequest(entry=_client_build_entry(args))
+                        timeseries_pb2.UpdateEntryRequest(entry=_client_build_entry(args))
                     )
                     out(f"UpdateEntry: ok={update_reply.ok} message={update_reply.message}")
                     return 0
 
                 case "delete":
                     delete_reply = client.DeleteEntry(
-                        energy_pb2.DeleteEntryRequest(
-                            key=energy_pb2.EntryKey(
+                        timeseries_pb2.DeleteEntryRequest(
+                            key=timeseries_pb2.EntryKey(
                                 meter_id=args.meter_id,
                                 stream=args.stream,
                                 timestamp_ms=_timestamp_from_datetime(args.timestamp),
@@ -150,7 +150,7 @@ def _run_client_action(
                         err("--start and --end are required when --action is query")
                         return 1
                     query_reply = client.QueryRange(
-                        energy_pb2.QueryRangeRequest(
+                        timeseries_pb2.QueryRangeRequest(
                             meter_id=args.meter_id,
                             stream=args.stream,
                             start_ms=_timestamp_to_milliseconds(_timestamp_from_datetime(start)),

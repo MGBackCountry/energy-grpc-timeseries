@@ -21,7 +21,7 @@ The service exposes an `EnergyStore` gRPC API with CRUD-style operations for sin
 - `QueryRange` returns points for one `(meter_id, stream)` series between two timestamps
 - `GetVersion` returns the application version
 
-The API contract is defined in `protos/energy.proto`.
+The API contract is defined in `protos/timeseries.proto`.
 
 ## Data model
 
@@ -57,7 +57,7 @@ Range queries read timestamps from the sorted set and then fetch matching values
 
 | Path | Purpose |
 | --- | --- |
-| `protos/energy.proto` | gRPC and protobuf contract |
+| `protos/timeseries.proto` | gRPC and protobuf contract |
 | `src/grpc_timeseries/server.py` | gRPC servicer and server startup |
 | `src/grpc_timeseries/redis_store.py` | Redis-backed time-series storage |
 | `src/grpc_timeseries/generated/` | checked-in generated protobuf/gRPC bindings |

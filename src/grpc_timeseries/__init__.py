@@ -11,7 +11,7 @@ def _version_from_pyproject() -> str:
 
 
 try:
-	__version__ = version("energy-grpc-timeseries")
+	__version__ = version("grpc-timeseries")
 except PackageNotFoundError:
 	# Running from source (for example via `uv run scripts/local_client.py`).
 	__version__ = _version_from_pyproject()

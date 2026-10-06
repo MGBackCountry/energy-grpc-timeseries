@@ -35,7 +35,7 @@ RUN mkdir -p /app/src/grpc_timeseries/generated \
 RUN make gen-protos
 
 # Fix relative imports in generated files
-RUN sed -i 's/^import energy_pb2 as energy__pb2$/from . import energy_pb2 as energy__pb2/' /app/src/grpc_timeseries/generated/energy_pb2_grpc.py
+RUN sed -i 's/^import timeseries_pb2 as timeseries__pb2$/from . import timeseries_pb2 as timeseries__pb2/' /app/src/grpc_timeseries/generated/timeseries_pb2_grpc.py
 
 # Install package into system Python
 RUN uv pip install --system .

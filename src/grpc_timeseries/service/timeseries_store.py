@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Any, Protocol, TypeAlias
 
 from .. import __version__
-from ..generated import energy_pb2, energy_pb2_grpc
+from ..generated import timeseries_pb2, timeseries_pb2_grpc
 from ..store.redis_time_series_store import PointConflictError, RedisTimeSeriesStore
 
 Point: TypeAlias = tuple[int, float]
@@ -31,7 +31,7 @@ class TimeSeriesStore(Protocol):
         limit: int = 0) -> list[Point]: pass
 
 
-def _timestamp_to_milliseconds(timestamp: energy_pb2.Timestamp) -> int:  # type: ignore[name-defined]
+def _timestamp_to_milliseconds(timestamp: timeseries_pb2.Timestamp) -> int:  # type: ignore[name-defined]
     return timestamp.seconds * 1_000 + timestamp.nanos // 1_000_000
 
 
@@ -45,9 +45,9 @@ def _timestamp_from_milliseconds(timestamp_ms: int):
     return protobuf_timestamp
 
 
-def _build_entry(meter_id: str, stream: str, timestamp_ms: int, value: float) -> energy_pb2.Entry:
-    return energy_pb2.Entry(
-        key=energy_pb2.EntryKey(
+def _build_entry(meter_id: str, stream: str, timestamp_ms: int, value: float) -> timeseries_pb2.Entry:
+    return timeseries_pb2.Entry(
+        key=timeseries_pb2.EntryKey(
             meter_id=meter_id,
             stream=stream,
             timestamp_ms=_timestamp_from_milliseconds(timestamp_ms),
@@ -56,15 +56,15 @@ def _build_entry(meter_id: str, stream: str, timestamp_ms: int, value: float) ->
     )
 
 
-class EnergyStoreServicer(energy_pb2_grpc.EnergyStoreServicer):
+class TimeSeriesServicer(timeseries_pb2_grpc.TimeSeriesServicer):
     def __init__(self, store: TimeSeriesStore | None = None):
         self.store: TimeSeriesStore = store or RedisTimeSeriesStore()
 
-    def GetVersion(self, request: Any, context: Any) -> energy_pb2.VersionReply:
+    def GetVersion(self, request: Any, context: Any) -> timeseries_pb2.VersionReply:
         del request, context
-        return energy_pb2.VersionReply(version=APP_VERSION)
+        return timeseries_pb2.VersionReply(version=APP_VERSION)
 
-    def SetEntry(self, request: Any, context: Any) -> energy_pb2.StatusReply:
+    def SetEntry(self, request: Any, context: Any) -> timeseries_pb2.StatusReply:
         del context
         e = request.entry
         k = e.key
@@ -72,39 +72,39 @@ class EnergyStoreServicer(energy_pb2_grpc.EnergyStoreServicer):
         try:
             self.store.create_point_if_absent(k.meter_id, k.stream, timestamp_ms, e.value)
         except PointConflictError:
-            return energy_pb2.StatusReply(ok=False, message="conflict")
+            return timeseries_pb2.StatusReply(ok=False, message="conflict")
 
-        return energy_pb2.StatusReply(ok=True, message="set")
+        return timeseries_pb2.StatusReply(ok=True, message="set")
 
-    def GetEntry(self, request: Any, context: Any) -> energy_pb2.GetEntryReply:
+    def GetEntry(self, request: Any, context: Any) -> timeseries_pb2.GetEntryReply:
         del context
         k = request.key
         timestamp_ms = _timestamp_to_milliseconds(k.timestamp_ms)
         v = self.store.get_point(k.meter_id, k.stream, timestamp_ms)
         if v is None:
-            return energy_pb2.GetEntryReply(found=False)
+            return timeseries_pb2.GetEntryReply(found=False)
         entry = _build_entry(k.meter_id, k.stream, timestamp_ms, v)
-        return energy_pb2.GetEntryReply(found=True, entry=entry)
+        return timeseries_pb2.GetEntryReply(found=True, entry=entry)
 
-    def UpdateEntry(self, request: Any, context: Any) -> energy_pb2.StatusReply:
+    def UpdateEntry(self, request: Any, context: Any) -> timeseries_pb2.StatusReply:
         del context
         e = request.entry
         k = e.key
         timestamp_ms = _timestamp_to_milliseconds(k.timestamp_ms)
         if not self.store.point_exists(k.meter_id, k.stream, timestamp_ms):
-            return energy_pb2.StatusReply(ok=False, message="not_found")
+            return timeseries_pb2.StatusReply(ok=False, message="not_found")
         self.store.overwrite_point(k.meter_id, k.stream, timestamp_ms, e.value)
 
-        return energy_pb2.StatusReply(ok=True, message="updated")
+        return timeseries_pb2.StatusReply(ok=True, message="updated")
 
-    def DeleteEntry(self, request: Any, context: Any) -> energy_pb2.StatusReply:
+    def DeleteEntry(self, request: Any, context: Any) -> timeseries_pb2.StatusReply:
         del context
         k = request.key
         timestamp_ms = _timestamp_to_milliseconds(k.timestamp_ms)
         ok = self.store.delete_existing_point(k.meter_id, k.stream, timestamp_ms)
-        return energy_pb2.StatusReply(ok=ok, message="deleted" if ok else "not_found")
+        return timeseries_pb2.StatusReply(ok=ok, message="deleted" if ok else "not_found")
 
-    def QueryRange(self, request: Any, context: Any) -> energy_pb2.QueryRangeReply:
+    def QueryRange(self, request: Any, context: Any) -> timeseries_pb2.QueryRangeReply:
         del context
         pts = self.store.get_points_in_range(
             request.meter_id,
@@ -113,6 +113,6 @@ class EnergyStoreServicer(energy_pb2_grpc.EnergyStoreServicer):
             request.end_ms,
             request.limit,
         )
-        return energy_pb2.QueryRangeReply(
-            points=[energy_pb2.QueryPoint(timestamp_ms=ts, value=val) for ts, val in pts]
+        return timeseries_pb2.QueryRangeReply(
+            points=[timeseries_pb2.QueryPoint(timestamp_ms=ts, value=val) for ts, val in pts]
         )

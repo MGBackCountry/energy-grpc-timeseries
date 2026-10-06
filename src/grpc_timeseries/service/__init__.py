@@ -1,3 +1,3 @@
-from .energy_store_service import APP_VERSION, EnergyStoreServicer, Point, TimeSeriesStore
+from .timeseries_store import APP_VERSION, TimeSeriesServicer, Point, TimeSeriesStore
 
-__all__ = ["APP_VERSION", "EnergyStoreServicer", "Point", "TimeSeriesStore"]
+__all__ = ["APP_VERSION", "TimeSeriesServicer", "Point", "TimeSeriesStore"]
