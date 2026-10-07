@@ -60,7 +60,7 @@ def serve(
     register_servicer(servicer, grpc_server)
     grpc_server.add_insecure_port(f"[::]:{port}")
     grpc_server.start()
-    out(f"gRPC EnergyStore running on port {port}")
+    out(f"gRPC TimeSeries running on port {port}")
     grpc_server.wait_for_termination()
     return 0
 

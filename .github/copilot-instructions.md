@@ -18,7 +18,7 @@ There is no dedicated lint or type-check command configured in `pyproject.toml` 
 
 This repository is a small Python gRPC service backed by Redis.
 
-- `../protos/timeseries.proto` defines the wire contract for the `EnergyStore` service.
+- `../protos/timeseries.proto` defines the wire contract for the `TimeSeries` service.
 - Generated protobuf and gRPC bindings live in `src/grpc_timeseries/generated/` and are consumed by the runtime server code in `src/grpc_timeseries/server.py`. They are ignored by Git (other than `__init__.py`) and must be regenerated after contract changes.
 - `grpc_timeseries.server:serve` is the package entry point. It reads `GRPC_PORT` from `config.py`, creates the gRPC server, and registers `TimeSeriesServicer`; the Compose service supplies the Redis host and port through environment variables.
 - `TimeSeriesServicer` depends on the `TimeSeriesStore` protocol rather than a concrete Redis client. Each RPC translates protobuf requests into store operations and maps results back into protobuf replies, which lets direct-servicer and gRPC-client tests inject `FakeRedisStore`.

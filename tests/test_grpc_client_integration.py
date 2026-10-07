@@ -44,7 +44,7 @@ def grpc_server_and_channel():
 def client(grpc_server_and_channel):
     """Provide a gRPC client stub."""
     _, channel, _ = grpc_server_and_channel
-    return timeseries_pb2_grpc.EnergyStoreStub(channel)
+    return timeseries_pb2_grpc.TimeSeriesStub(channel)
 
 
 class TestGrpcClientIntegration:

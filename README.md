@@ -12,7 +12,7 @@ Examples of streams are `consumed_kwh`, `produced_kwh`, `power`, or `voltage`.
 
 ## What the service does
 
-The service exposes an `EnergyStore` gRPC API with CRUD-style operations for single points plus a range query:
+The service exposes a `TimeSeries` gRPC API with CRUD-style operations for single points plus a range query:
 
 - `SetEntry` stores or overwrites one point
 - `GetEntry` fetches one point by exact key

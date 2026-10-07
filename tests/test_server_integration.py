@@ -285,7 +285,7 @@ def test_serve_configures_and_starts_grpc_server(capsys):
 
     output = capsys.readouterr().out.strip()
     assert result == 0
-    assert output == "gRPC EnergyStore running on port 50051"
+    assert output == "gRPC TimeSeries running on port 50051"
 
 
 def test_serve_routes_client_actions_without_starting_server():
@@ -395,8 +395,8 @@ def test_run_client_action_delete(capsys):
     ready_future.result = Mock(return_value=None)
     grpc.channel_ready_future = Mock(return_value=ready_future)
 
-    original_stub = timeseries_pb2_grpc.EnergyStoreStub
-    timeseries_pb2_grpc.EnergyStoreStub = Mock(return_value=client_mock)
+    original_stub = timeseries_pb2_grpc.TimeSeriesStub
+    timeseries_pb2_grpc.TimeSeriesStub = Mock(return_value=client_mock)
 
     try:
         args = types.SimpleNamespace(
@@ -414,7 +414,7 @@ def test_run_client_action_delete(capsys):
     finally:
         grpc.insecure_channel = original_channel
         grpc.channel_ready_future = original_ready
-        timeseries_pb2_grpc.EnergyStoreStub = original_stub
+        timeseries_pb2_grpc.TimeSeriesStub = original_stub
 
 
 def test_run_client_action_get_converts_datetime_to_protobuf_timestamp(capsys):
@@ -433,8 +433,8 @@ def test_run_client_action_get_converts_datetime_to_protobuf_timestamp(capsys):
     ready_future.result = Mock(return_value=None)
     grpc.channel_ready_future = Mock(return_value=ready_future)
 
-    original_stub = timeseries_pb2_grpc.EnergyStoreStub
-    timeseries_pb2_grpc.EnergyStoreStub = Mock(return_value=client_mock)
+    original_stub = timeseries_pb2_grpc.TimeSeriesStub
+    timeseries_pb2_grpc.TimeSeriesStub = Mock(return_value=client_mock)
 
     try:
         args = types.SimpleNamespace(
@@ -453,7 +453,7 @@ def test_run_client_action_get_converts_datetime_to_protobuf_timestamp(capsys):
     finally:
         grpc.insecure_channel = original_channel
         grpc.channel_ready_future = original_ready
-        timeseries_pb2_grpc.EnergyStoreStub = original_stub
+        timeseries_pb2_grpc.TimeSeriesStub = original_stub
 
 
 def test_run_client_action_query(capsys):
@@ -475,8 +475,8 @@ def test_run_client_action_query(capsys):
     ready_future.result = Mock(return_value=None)
     grpc.channel_ready_future = Mock(return_value=ready_future)
 
-    original_stub = timeseries_pb2_grpc.EnergyStoreStub
-    timeseries_pb2_grpc.EnergyStoreStub = Mock(return_value=client_mock)
+    original_stub = timeseries_pb2_grpc.TimeSeriesStub
+    timeseries_pb2_grpc.TimeSeriesStub = Mock(return_value=client_mock)
 
     try:
         args = types.SimpleNamespace(
@@ -501,7 +501,7 @@ def test_run_client_action_query(capsys):
     finally:
         grpc.insecure_channel = original_channel
         grpc.channel_ready_future = original_ready
-        timeseries_pb2_grpc.EnergyStoreStub = original_stub
+        timeseries_pb2_grpc.TimeSeriesStub = original_stub
 
 
 def test_run_client_action_version(capsys):
@@ -521,8 +521,8 @@ def test_run_client_action_version(capsys):
     ready_future.result = Mock(return_value=None)
     grpc.channel_ready_future = Mock(return_value=ready_future)
 
-    original_stub = timeseries_pb2_grpc.EnergyStoreStub
-    timeseries_pb2_grpc.EnergyStoreStub = Mock(return_value=client_mock)
+    original_stub = timeseries_pb2_grpc.TimeSeriesStub
+    timeseries_pb2_grpc.TimeSeriesStub = Mock(return_value=client_mock)
 
     try:
         args = types.SimpleNamespace(
@@ -540,7 +540,7 @@ def test_run_client_action_version(capsys):
     finally:
         grpc.insecure_channel = original_channel
         grpc.channel_ready_future = original_ready
-        timeseries_pb2_grpc.EnergyStoreStub = original_stub
+        timeseries_pb2_grpc.TimeSeriesStub = original_stub
 
 
 def test_run_client_action_query_missing_start():

@@ -15,6 +15,7 @@ RUN pip install --no-cache-dir uv
 
 # Copy dependency metadata first (best cache reuse)
 COPY pyproject.toml /app/
+COPY README.md /app/
 
 # Install dependencies. This repository does not commit a uv.lock file.
 RUN uv sync

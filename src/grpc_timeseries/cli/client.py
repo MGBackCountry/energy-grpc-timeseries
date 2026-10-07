@@ -85,7 +85,7 @@ def _run_client_action(
     try:
         with grpc.insecure_channel(args.target) as channel:
             grpc.channel_ready_future(channel).result(timeout=5)
-            client = timeseries_pb2_grpc.EnergyStoreStub(channel)
+            client = timeseries_pb2_grpc.TimeSeriesStub(channel)
 
             match args.action:
                 case "get":

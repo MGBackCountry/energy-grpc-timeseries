@@ -1,11 +1,11 @@
 syntax = "proto3";
 
-package energy;
+package timeseries;
 
 import "google/protobuf/timestamp.proto";
 import "google/protobuf/empty.proto";
 
-service EnergyStore {
+service TimeSeries {
   rpc SetEntry(SetEntryRequest) returns (StatusReply);
   rpc GetEntry(GetEntryRequest) returns (GetEntryReply);
   rpc UpdateEntry(UpdateEntryRequest) returns (StatusReply);
