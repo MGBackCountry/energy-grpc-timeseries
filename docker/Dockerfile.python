@@ -17,8 +17,9 @@ RUN pip install --no-cache-dir uv
 COPY pyproject.toml /app/
 COPY README.md /app/
 
-# Install dependencies. This repository does not commit a uv.lock file.
-RUN uv sync
+# Install dependencies only (skip building/installing this project, since
+# src/ isn't copied yet). This repository does not commit a uv.lock file.
+RUN uv sync --no-install-project
 
 COPY Makefile /app/
 COPY protos/ /app/protos/
