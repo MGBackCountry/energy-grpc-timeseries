@@ -1,5 +1,5 @@
-from energy_server.generated import energy_pb2
-from energy_server.redis_store import PointConflictError
+from grpc_timeseries.generated import timeseries_pb2
+from grpc_timeseries.redis_store import PointConflictError
 from google.protobuf.timestamp_pb2 import Timestamp
 
 
@@ -59,9 +59,9 @@ def make_entry(
     stream: str = "power",
     timestamp_ms: int = 1000,
     value: float = 12.5,
-) -> energy_pb2.Entry:
-    return energy_pb2.Entry(
-        key=energy_pb2.EntryKey(
+) -> timeseries_pb2.Entry:
+    return timeseries_pb2.Entry(
+        key=timeseries_pb2.EntryKey(
             meter_id=meter_id,
             stream=stream,
             timestamp_ms=Timestamp(
@@ -77,8 +77,8 @@ def make_key(
     meter_id: str = "m-1",
     stream: str = "power",
     timestamp_ms: int = 1000,
-) -> energy_pb2.EntryKey:
-    return energy_pb2.EntryKey(
+) -> timeseries_pb2.EntryKey:
+    return timeseries_pb2.EntryKey(
         meter_id=meter_id,
         stream=stream,
         timestamp_ms=Timestamp(

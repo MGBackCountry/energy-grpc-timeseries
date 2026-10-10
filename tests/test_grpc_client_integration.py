@@ -6,8 +6,8 @@ from datetime import UTC, datetime, timedelta
 import grpc
 import pytest
 
-from energy_server import server
-from energy_server.generated import energy_pb2, energy_pb2_grpc
+from grpc_timeseries import server
+from grpc_timeseries.generated import timeseries_pb2, timeseries_pb2_grpc
 from google.protobuf import empty_pb2
 
 from support import FakeRedisStore
@@ -24,10 +24,10 @@ def grpc_server_and_channel():
     Cleanup is handled automatically after the test completes.
     """
     fake_store = FakeRedisStore()
-    servicer = server.EnergyStoreServicer(store=fake_store)
+    servicer = server.TimeSeriesServicer(store=fake_store)
 
     grpc_server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
-    energy_pb2_grpc.add_EnergyStoreServicer_to_server(servicer, grpc_server)
+    timeseries_pb2_grpc.add_TimeSeriesServicer_to_server(servicer, grpc_server)
     port = grpc_server.add_insecure_port("127.0.0.1:0")
     grpc_server.start()
 
@@ -44,7 +44,7 @@ def grpc_server_and_channel():
 def client(grpc_server_and_channel):
     """Provide a gRPC client stub."""
     _, channel, _ = grpc_server_and_channel
-    return energy_pb2_grpc.EnergyStoreStub(channel)
+    return timeseries_pb2_grpc.TimeSeriesStub(channel)
 
 
 class TestGrpcClientIntegration:
@@ -61,9 +61,9 @@ class TestGrpcClientIntegration:
         # Simulate meter data: home consumption at 2024-01-15 10:30:00 UTC
         timestamp_ms = 1705318200000  # 2024-01-15 10:30:00 UTC
 
-        request = energy_pb2.SetEntryRequest(
-            entry=energy_pb2.Entry(
-                key=energy_pb2.EntryKey(
+        request = timeseries_pb2.SetEntryRequest(
+            entry=timeseries_pb2.Entry(
+                key=timeseries_pb2.EntryKey(
                     meter_id="home-meter-001",
                     stream="consumed_kwh",
                     timestamp_ms=timestamp_datetime(timestamp_ms),
@@ -79,9 +79,9 @@ class TestGrpcClientIntegration:
 
     def test_set_entry_duplicate_same_value_is_idempotent(self, client):
         timestamp_ms = 1705318200000
-        request = energy_pb2.SetEntryRequest(
-            entry=energy_pb2.Entry(
-                key=energy_pb2.EntryKey(
+        request = timeseries_pb2.SetEntryRequest(
+            entry=timeseries_pb2.Entry(
+                key=timeseries_pb2.EntryKey(
                     meter_id="home-meter-001",
                     stream="consumed_kwh",
                     timestamp_ms=timestamp_datetime(timestamp_ms),
@@ -100,9 +100,9 @@ class TestGrpcClientIntegration:
 
     def test_set_entry_duplicate_different_value_returns_conflict(self, client):
         timestamp_ms = 1705318200000
-        first_request = energy_pb2.SetEntryRequest(
-            entry=energy_pb2.Entry(
-                key=energy_pb2.EntryKey(
+        first_request = timeseries_pb2.SetEntryRequest(
+            entry=timeseries_pb2.Entry(
+                key=timeseries_pb2.EntryKey(
                     meter_id="home-meter-001",
                     stream="consumed_kwh",
                     timestamp_ms=timestamp_datetime(timestamp_ms),
@@ -110,9 +110,9 @@ class TestGrpcClientIntegration:
                 value=42.5,
             )
         )
-        second_request = energy_pb2.SetEntryRequest(
-            entry=energy_pb2.Entry(
-                key=energy_pb2.EntryKey(
+        second_request = timeseries_pb2.SetEntryRequest(
+            entry=timeseries_pb2.Entry(
+                key=timeseries_pb2.EntryKey(
                     meter_id="home-meter-001",
                     stream="consumed_kwh",
                     timestamp_ms=timestamp_datetime(timestamp_ms),
@@ -140,8 +140,8 @@ class TestGrpcClientIntegration:
         fake_store.overwrite_point(meter_id, stream, timestamp_ms, value)
 
         # Retrieve via gRPC
-        request = energy_pb2.GetEntryRequest(
-            key=energy_pb2.EntryKey(
+        request = timeseries_pb2.GetEntryRequest(
+            key=timeseries_pb2.EntryKey(
                 meter_id=meter_id,
                 stream=stream,
                 timestamp_ms=timestamp_datetime(timestamp_ms),
@@ -158,8 +158,8 @@ class TestGrpcClientIntegration:
 
     def test_get_entry_not_found_via_grpc(self, client):
         """Test GetEntry returns found=False for missing data."""
-        request = energy_pb2.GetEntryRequest(
-            key=energy_pb2.EntryKey(
+        request = timeseries_pb2.GetEntryRequest(
+            key=timeseries_pb2.EntryKey(
                 meter_id="nonexistent-meter",
                 stream="power",
                 timestamp_ms=timestamp_datetime(9999999),
@@ -181,9 +181,9 @@ class TestGrpcClientIntegration:
         fake_store.overwrite_point(meter_id, stream, timestamp_ms, 10.0)
 
         # Update via gRPC
-        request = energy_pb2.UpdateEntryRequest(
-            entry=energy_pb2.Entry(
-                key=energy_pb2.EntryKey(
+        request = timeseries_pb2.UpdateEntryRequest(
+            entry=timeseries_pb2.Entry(
+                key=timeseries_pb2.EntryKey(
                     meter_id=meter_id,
                     stream=stream,
                     timestamp_ms=timestamp_datetime(timestamp_ms),
@@ -198,8 +198,8 @@ class TestGrpcClientIntegration:
         assert response.message == "updated"
 
         # Verify the update
-        get_request = energy_pb2.GetEntryRequest(
-            key=energy_pb2.EntryKey(
+        get_request = timeseries_pb2.GetEntryRequest(
+            key=timeseries_pb2.EntryKey(
                 meter_id=meter_id,
                 stream=stream,
                 timestamp_ms=timestamp_datetime(timestamp_ms),
@@ -210,9 +210,9 @@ class TestGrpcClientIntegration:
 
     def test_update_entry_not_found_via_grpc(self, client):
         """Test UpdateEntry fails when entry doesn't exist."""
-        request = energy_pb2.UpdateEntryRequest(
-            entry=energy_pb2.Entry(
-                key=energy_pb2.EntryKey(
+        request = timeseries_pb2.UpdateEntryRequest(
+            entry=timeseries_pb2.Entry(
+                key=timeseries_pb2.EntryKey(
                     meter_id="nonexistent",
                     stream="power",
                     timestamp_ms=timestamp_datetime(1000),
@@ -237,8 +237,8 @@ class TestGrpcClientIntegration:
         fake_store.overwrite_point(meter_id, stream, timestamp_ms, 42.5)
 
         # Delete via gRPC
-        request = energy_pb2.DeleteEntryRequest(
-            key=energy_pb2.EntryKey(
+        request = timeseries_pb2.DeleteEntryRequest(
+            key=timeseries_pb2.EntryKey(
                 meter_id=meter_id,
                 stream=stream,
                 timestamp_ms=timestamp_datetime(timestamp_ms),
@@ -251,8 +251,8 @@ class TestGrpcClientIntegration:
         assert response.message == "deleted"
 
         # Verify deletion
-        get_request = energy_pb2.GetEntryRequest(
-            key=energy_pb2.EntryKey(
+        get_request = timeseries_pb2.GetEntryRequest(
+            key=timeseries_pb2.EntryKey(
                 meter_id=meter_id,
                 stream=stream,
                 timestamp_ms=timestamp_datetime(timestamp_ms),
@@ -263,8 +263,8 @@ class TestGrpcClientIntegration:
 
     def test_delete_entry_not_found_via_grpc(self, client):
         """Test DeleteEntry fails when entry doesn't exist."""
-        request = energy_pb2.DeleteEntryRequest(
-            key=energy_pb2.EntryKey(
+        request = timeseries_pb2.DeleteEntryRequest(
+            key=timeseries_pb2.EntryKey(
                 meter_id="nonexistent",
                 stream="power",
                 timestamp_ms=timestamp_datetime(1000),
@@ -325,7 +325,7 @@ class TestGrpcClientIntegration:
         start_timestamp = base_timestamp
         end_timestamp = base_timestamp + (24 * 3600 * 1000) - 1  # End of day
 
-        request = energy_pb2.QueryRangeRequest(
+        request = timeseries_pb2.QueryRangeRequest(
             meter_id=meter_id,
             stream=stream,
             start_ms=start_timestamp,
@@ -368,7 +368,7 @@ class TestGrpcClientIntegration:
             fake_store.overwrite_point(meter_id, stream, timestamp, float(i + 1) * 0.5)
 
         # Query with limit=5
-        request = energy_pb2.QueryRangeRequest(
+        request = timeseries_pb2.QueryRangeRequest(
             meter_id=meter_id,
             stream=stream,
             start_ms=base_timestamp,
@@ -392,7 +392,7 @@ class TestGrpcClientIntegration:
         fake_store.overwrite_point(meter_id, stream, 2000, 2.0)
         fake_store.overwrite_point(meter_id, stream, 3000, 3.0)
 
-        request = energy_pb2.QueryRangeRequest(
+        request = timeseries_pb2.QueryRangeRequest(
             meter_id=meter_id,
             stream=stream,
             start_ms=1000,
@@ -417,7 +417,7 @@ class TestGrpcClientIntegration:
         for index, value in enumerate((0.5, 1.0, 1.5), start=1):
             fake_store.overwrite_point(meter_id, stream, index * 1000, value)
 
-        request = energy_pb2.QueryRangeRequest(
+        request = timeseries_pb2.QueryRangeRequest(
             meter_id=meter_id,
             stream=stream,
             start_ms=0,
@@ -432,7 +432,7 @@ class TestGrpcClientIntegration:
 
     def test_get_points_in_range_empty_result(self, client):
         """Test QueryRange returns empty list when no data matches."""
-        request = energy_pb2.QueryRangeRequest(
+        request = timeseries_pb2.QueryRangeRequest(
             meter_id="nonexistent-meter",
             stream="power",
             start_ms=1000,
@@ -454,9 +454,9 @@ class TestGrpcClientIntegration:
         timestamp = 1705318200000  # 2024-01-15 10:30:00 UTC
 
         # Household 1: Power consumption
-        meter1_consumed_request = energy_pb2.SetEntryRequest(
-            entry=energy_pb2.Entry(
-                key=energy_pb2.EntryKey(
+        meter1_consumed_request = timeseries_pb2.SetEntryRequest(
+            entry=timeseries_pb2.Entry(
+                key=timeseries_pb2.EntryKey(
                     meter_id="household-1",
                     stream="consumed_kwh",
                     timestamp_ms=timestamp_datetime(timestamp),
@@ -468,9 +468,9 @@ class TestGrpcClientIntegration:
         assert response1.ok is True
 
         # Household 1: Solar production
-        meter1_produced_request = energy_pb2.SetEntryRequest(
-            entry=energy_pb2.Entry(
-                key=energy_pb2.EntryKey(
+        meter1_produced_request = timeseries_pb2.SetEntryRequest(
+            entry=timeseries_pb2.Entry(
+                key=timeseries_pb2.EntryKey(
                     meter_id="household-1",
                     stream="produced_kwh",
                     timestamp_ms=timestamp_datetime(timestamp),
@@ -482,9 +482,9 @@ class TestGrpcClientIntegration:
         assert response2.ok is True
 
         # Household 2: Power consumption
-        meter2_consumed_request = energy_pb2.SetEntryRequest(
-            entry=energy_pb2.Entry(
-                key=energy_pb2.EntryKey(
+        meter2_consumed_request = timeseries_pb2.SetEntryRequest(
+            entry=timeseries_pb2.Entry(
+                key=timeseries_pb2.EntryKey(
                     meter_id="household-2",
                     stream="consumed_kwh",
                     timestamp_ms=timestamp_datetime(timestamp),
@@ -496,7 +496,7 @@ class TestGrpcClientIntegration:
         assert response3.ok is True
 
         # Query household 1 consumption
-        query_h1 = energy_pb2.QueryRangeRequest(
+        query_h1 = timeseries_pb2.QueryRangeRequest(
             meter_id="household-1",
             stream="consumed_kwh",
             start_ms=timestamp - 1000,
@@ -508,7 +508,7 @@ class TestGrpcClientIntegration:
         assert result_h1.points[0].value == pytest.approx(2.5)
 
         # Query household 1 production
-        query_h1_prod = energy_pb2.QueryRangeRequest(
+        query_h1_prod = timeseries_pb2.QueryRangeRequest(
             meter_id="household-1",
             stream="produced_kwh",
             start_ms=timestamp - 1000,
@@ -520,7 +520,7 @@ class TestGrpcClientIntegration:
         assert result_h1_prod.points[0].value == pytest.approx(1.2)
 
         # Query household 2 consumption
-        query_h2 = energy_pb2.QueryRangeRequest(
+        query_h2 = timeseries_pb2.QueryRangeRequest(
             meter_id="household-2",
             stream="consumed_kwh",
             start_ms=timestamp - 1000,

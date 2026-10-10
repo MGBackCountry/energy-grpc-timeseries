@@ -14,9 +14,9 @@ services:
       retries: 3
       start_period: 15s
     networks:
-      - energy_network
+      - grpc_timeseries_network
 
-  energy_server:
+  grpc-timeseries:
     build:
       context: .
       dockerfile: docker/Dockerfile.python
@@ -29,12 +29,12 @@ services:
       redis:
         condition: service_healthy
     networks:
-      - energy_network
+      - grpc_timeseries_network
 
 volumes:
   redis_data:
 
 networks:
-  energy_network:
+  grpc_timeseries_network:
     driver: bridge
 

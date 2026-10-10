@@ -1,7 +1,7 @@
 # Integration Test Implementation Summary
 
 ## Overview
-Created comprehensive real gRPC client integration tests for the energy-grpc-timeseries service. These tests validate the complete gRPC stack with real client-server communication and realistic energy meter data.
+Created comprehensive real gRPC client integration tests for the grpc-timeseries service. These tests validate the complete gRPC stack with real client-server communication and realistic energy meter data.
 
 ## What Was Implemented
 
@@ -23,7 +23,7 @@ Created comprehensive real gRPC client integration tests for the energy-grpc-tim
 12. ✅ `test_complete_workflow_multi_meter` - **End-to-end multi-household scenario**
 
 ### 2. **Proto Definition Enhancement**
-📄 **File**: `protos/energy.proto`
+📄 **File**: `protos/timeseries.proto`
 
 - Uncommented `QueryRange` RPC in the service definition
 - Now the proto includes all implemented methods:
@@ -51,7 +51,7 @@ Comprehensive guide including:
                         ↓
         gRPC Client Stub ↔ gRPC Server
         (synchronous)        ↓
-                     EnergyStoreServicer
+                     TimeSeriesServicer
                              ↓
                      FakeRedisStore
                    (in-memory, fast, isolated)
@@ -127,7 +127,7 @@ python -m pytest tests/test_grpc_client_integration.py::TestGrpcClientIntegratio
 python -m pytest tests/ -v
 
 # Run with coverage
-python -m pytest tests/ --cov=energy_server --cov-report=html
+python -m pytest tests/ --cov=grpc_timeseries --cov-report=html
 ```
 
 ## Key Features
@@ -149,14 +149,14 @@ python -m pytest tests/ --cov=energy_server --cov-report=html
 |------|--------|---------|
 | `tests/test_grpc_client_integration.py` | ✨ Created | 12 new integration tests |
 | `INTEGRATION_TESTS.md` | ✨ Created | Comprehensive test documentation |
-| `protos/energy.proto` | 🔄 Updated | Uncommented QueryRange RPC |
-| `src/energy_server/generated/` | 🔄 Regenerated | Updated proto bindings |
+| `protos/timeseries.proto` | 🔄 Updated | Uncommented QueryRange RPC |
+| `src/grpc_timeseries/generated/` | 🔄 Regenerated | Updated proto bindings |
 
 ## Integration with Existing Tests
 
 The new integration tests are fully compatible with existing unit tests:
 - Share the same FakeRedisStore implementation
-- Use the existing EnergyStoreServicer
+- Use the existing TimeSeriesServicer
 - Don't interfere with unit test execution
 - Both test suites can run together
 

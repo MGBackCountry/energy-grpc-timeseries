@@ -21,8 +21,8 @@ from .cli.client import (
     build_parser,
 )
 from .config import GRPC_PORT
-from .generated import energy_pb2, energy_pb2_grpc
-from .service.energy_store_service import APP_VERSION, EnergyStoreServicer, Point, TimeSeriesStore
+from .generated import timeseries_pb2, timeseries_pb2_grpc
+from .service.timeseries_store import APP_VERSION, TimeSeriesServicer, Point, TimeSeriesStore
 from .store.redis_time_series_store import PointConflictError, RedisStoreDriftError, RedisTimeSeriesStore
 
 OutFn = Callable[[str], Any]
@@ -36,15 +36,15 @@ def _default_grpc_server_factory() -> grpc.Server:
 def serve(
     args: argparse.Namespace | None = None,
     grpc_server_factory: Callable[[], grpc.Server] | None = None,
-    register_servicer: Callable[[EnergyStoreServicer, grpc.Server], None] | None = None,
-    servicer_factory: Callable[[], EnergyStoreServicer] | None = None,
+    register_servicer: Callable[[TimeSeriesServicer, grpc.Server], None] | None = None,
+    servicer_factory: Callable[[], TimeSeriesServicer] | None = None,
     port: int | None = None,
     out: OutFn = print,
 ) -> int:
     args = args or build_parser().parse_args()
     grpc_server_factory = grpc_server_factory or _default_grpc_server_factory
-    register_servicer = register_servicer or energy_pb2_grpc.add_EnergyStoreServicer_to_server
-    servicer_factory = servicer_factory or EnergyStoreServicer
+    register_servicer = register_servicer or timeseries_pb2_grpc.add_TimeSeriesServicer_to_server
+    servicer_factory = servicer_factory or TimeSeriesServicer
     port = port if port is not None else GRPC_PORT
 
     if getattr(args, "version", False):
@@ -60,7 +60,7 @@ def serve(
     register_servicer(servicer, grpc_server)
     grpc_server.add_insecure_port(f"[::]:{port}")
     grpc_server.start()
-    out(f"gRPC EnergyStore running on port {port}")
+    out(f"gRPC TimeSeries running on port {port}")
     grpc_server.wait_for_termination()
     return 0
 
@@ -68,7 +68,7 @@ def serve(
 __all__ = [
     "APP_VERSION",
     "DEFAULT_MAX_WORKERS",
-    "EnergyStoreServicer",
+    "TimeSeriesServicer",
     "OutFn",
     "Point",
     "PointConflictError",
@@ -89,8 +89,8 @@ __all__ = [
     "_timestamp_to_milliseconds",
     "build_parser",
     "empty_pb2",
-    "energy_pb2",
-    "energy_pb2_grpc",
+    "timeseries_pb2",
+    "timeseries_pb2_grpc",
     "grpc",
     "serve",
 ]

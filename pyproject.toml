@@ -1,7 +1,7 @@
 [project]
-name = "energy-grpc-timeseries"
-version = "2.1.0"
-description = "Energy tracking gRPC service"
+name = "grpc-timeseries"
+version = "3.0.0"
+description = "gRPC time-series service backed by Redis"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
@@ -22,9 +22,10 @@ constraint-dependencies = [
     "grpcio>=1.80",
     "grpcio-tools>=1.80",
 ]
+package = true
 
 [project.scripts]
-energy-server = "energy_server.server:serve"
+grpc-timeseries = "grpc_timeseries.server:serve"
 
 [tool.setuptools]
 package-dir = {"" = "src"}
@@ -36,4 +37,4 @@ where = ["src"]
 testpaths = ["tests"]
 python_files = ["test_*.py"]
 addopts = "-v -s"
-pythonpath = ["src", "src/energy_server/generated"]
+pythonpath = ["src", "src/grpc_timeseries/generated"]
